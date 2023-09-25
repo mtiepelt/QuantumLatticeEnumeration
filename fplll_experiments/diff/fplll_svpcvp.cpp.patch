@@ -1,0 +1,110 @@
+diff --git a/fplll/svpcvp.cpp b/fplll/svpcvp.cpp
+index fc806ad0..fd341d79 100644
+--- a/fplll/svpcvp.cpp
++++ b/fplll/svpcvp.cpp
+@@ -18,6 +18,7 @@
+ #include "svpcvp.h"
+ #include "enum/enumerate.h"
+ #include "enum/topenum.h"
++#include <iostream>
+ 
+ FPLLL_BEGIN_NAMESPACE
+ 
+@@ -71,13 +72,34 @@ static void get_basis_min(Z_NR<mpz_t> &basis_min, MatGSOInterface<Z_NR<mpz_t>, F
+   }
+ }
+ 
++
+ static bool enumerate_svp(int d, MatGSOInterface<Z_NR<mpz_t>, FP_NR<mpfr_t>> &gso,
+                           FP_NR<mpfr_t> &max_dist, ErrorBoundedEvaluator &evaluator,
+                           const vector<enumf> &pruning, int flags)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "\033[31;1;4m> enumerate_svp\033[0m" << std::endl;
++  #endif
+   Enumeration<Z_NR<mpz_t>, FP_NR<mpfr_t>> enumobj(gso, evaluator);
+   bool dual = (flags & SVP_DUAL);
+   enumobj.enumerate(0, d, max_dist, 0, vector<FP_NR<mpfr_t>>(), vector<enumxt>(), pruning, dual);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl, ' ') << "------------------------------" << std::endl;
++  // auto nodes_array = enumobj.get_nodes_array();
++  // std::cout << "nodes = {" << std::endl;
++  // for (unsigned i = 0; i < nodes_array.size(); i++) {
++  //   std::cout << std::string(2 * print_out_lvl, ' ') << i << ": " << nodes_array[i] << "," << std::endl;
++  // }
++  // std::cout << "}" << std::endl;
++  std::cout << std::string(2 * print_out_lvl, ' ') << "\033[31;1;4m>" << " total nodes " << enumobj.get_nodes() << "\033[0m" << std::endl;
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "\033[31;1;4m< enumerate_svp\033[0m" << std::endl;
++  std::cout << "enum tree " << std::endl << enumobj.get_tree() << std::endl;
++  std::cout << "total nodes " << enumobj.get_nodes() << std::endl;
++  std::cout << "adjus nodes " << enumobj.get_nodes() + d - 2 << std::endl;
++  for (int i = 0; i < d; i++) {
++    std::cout << "lvl " << i << " nodes " << enumobj.get_nodes(i) << std::endl;
++  }
++  #endif
+   return !evaluator.empty();
+ }
+ 
+@@ -89,6 +111,9 @@ static int shortest_vector_ex(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord,
+                               vector<vector<Z_NR<mpz_t>>> *auxsol_coord = nullptr,
+                               vector<enumf> *auxsol_dist = nullptr, int max_aux_sols = 0)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "\033[31;1;4m> shortest_vector_ex\033[0m" << std::endl;
++  #endif
+   bool findsubsols = (subsol_coord != nullptr) && (subsol_dist != nullptr);
+   bool findauxsols = (auxsol_coord != nullptr) && (auxsol_dist != nullptr) && (max_aux_sols != 0);
+ 
+@@ -96,6 +121,9 @@ static int shortest_vector_ex(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord,
+   int d = b.get_rows();
+   // n = dimension of the space
+   int n = b.get_cols();
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl, ' ') << "\033[31;1;4mrank " << d << " dim " << n << "\033[0m" << std::endl;
++  #endif
+ 
+   FPLLL_CHECK(d > 0 && n > 0, "shortestVector: empty matrix");
+   FPLLL_CHECK(d <= n, "shortestVector: number of vectors > size of the vectors");
+@@ -235,22 +263,40 @@ static int shortest_vector_ex(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord,
+     }
+   }
+ 
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "\033[31;1;4m< shortest_vector_ex\033[0m" << std::endl;
++  #endif
+   delete evaluator;
+   FP_NR<mpfr_t>::set_prec(old_prec);
+   return result;
+ }
+ 
++
+ int shortest_vector(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord, SVPMethod method, int flags)
+ {
+   long long tmp;
+-  return shortest_vector_ex(b, sol_coord, method, vector<double>(), flags, EVALMODE_SV, tmp);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "\033[31;1;4m> shortest_vector\033[0m" << std::endl;
++  #endif
++  auto rv = shortest_vector_ex(b, sol_coord, method, vector<double>(), flags, EVALMODE_SV, tmp);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "\033[31;1;4m< shortest_vector\033[0m" << std::endl;
++  #endif
++  return rv;
+ }
+ 
+ int shortest_vector_pruning(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord,
+                             const vector<double> &pruning, int flags)
+ {
+   long long tmp;
+-  return shortest_vector_ex(b, sol_coord, SVPM_FAST, pruning, flags, EVALMODE_SV, tmp);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "\033[31;1;4m> shortest_vector_pruning\033[0m" << std::endl;
++  #endif
++  auto rv = shortest_vector_ex(b, sol_coord, SVPM_FAST, pruning, flags, EVALMODE_SV, tmp);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "\033[31;1;4m< shortest_vector_pruning\033[0m" << std::endl;
++  #endif
++  return rv;
+ }
+ 
+ int shortest_vector_pruning(ZZ_mat<mpz_t> &b, vector<Z_NR<mpz_t>> &sol_coord,

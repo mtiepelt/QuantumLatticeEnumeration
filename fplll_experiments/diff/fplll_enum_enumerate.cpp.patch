@@ -1,0 +1,238 @@
+diff --git a/fplll/enum/enumerate.cpp b/fplll/enum/enumerate.cpp
+index b87977a4..78eb10e3 100644
+--- a/fplll/enum/enumerate.cpp
++++ b/fplll/enum/enumerate.cpp
+@@ -17,12 +17,16 @@
+    along with fplll. If not, see <http://www.gnu.org/licenses/>. */
+ 
+ #include "enumerate.h"
++#include <iostream>
+ 
+ FPLLL_BEGIN_NAMESPACE
+ 
+ template <typename ZT, typename FT>
+ void EnumerationDyn<ZT, FT>::reset(enumf cur_dist, int cur_depth)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::reset" << std::endl;
++  #endif
+   // FPLLL_TRACE("Reset level " << cur_depth);
+   int new_dim = cur_depth + 1;
+ 
+@@ -53,6 +57,9 @@ void EnumerationDyn<ZT, FT>::reset(enumf cur_dist, int cur_depth)
+       process_solution(sol_dist + cur_dist);
+     }
+   }
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::reset" << std::endl;
++  #endif
+ }
+ 
+ template <typename ZT, typename FT>
+@@ -61,6 +68,10 @@ void EnumerationDyn<ZT, FT>::enumerate(int first, int last, FT &fmaxdist, long f
+                                        const vector<enumxt> &subtree, const vector<enumf> &pruning,
+                                        bool _dual, bool subtree_reset)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::enumerate" << std::endl;
++  std::cout << std::string(2 * print_out_lvl, ' ') << "first " << first << " last " << last << std::endl;
++  #endif
+   bool solvingsvp = target_coord.empty();
+   dual            = _dual;
+   pruning_bounds  = pruning;
+@@ -68,6 +79,9 @@ void EnumerationDyn<ZT, FT>::enumerate(int first, int last, FT &fmaxdist, long f
+   if (last == -1)
+     last = _gso.d;
+   d = last - first;
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl, ' ') << "rank " << d << std::endl;
++  #endif
+   fx.resize(d);
+   FPLLL_CHECK(d < maxdim, "enumerate: dimension is too high");
+   FPLLL_CHECK((solvingsvp || !dual), "CVP for dual not implemented! What does that even mean? ");
+@@ -156,16 +170,113 @@ void EnumerationDyn<ZT, FT>::enumerate(int first, int last, FT &fmaxdist, long f
+     for (auto it = _evaluator.begin(), itend = _evaluator.end(); it != itend; ++it)
+       reverse_by_swap(it->second, 0, d - 1);
+   }
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::enumerate" << std::endl;
++  #endif
++}
++
++template <typename ZT, typename FT>
++void Enumeration<ZT, FT>::enumerate(int first, int last, FT &fmaxdist, long fmaxdistexpo,
++                 const vector<FT> &target_coord,
++                 const vector<enumxt> &subtree,
++                 const vector<enumf> &pruning, bool dual,
++                 bool subtree_reset)
++  {
++    #ifdef PRINT_OUT
++    std::cout << std::string(2 * print_out_lvl++, ' ') << "> Enumeration::enumerate" << std::endl;
++    std::cout << std::string(2 * print_out_lvl, ' ') << "first " << first << " last " << last << std::endl;
++    #endif
++    // check for external enumerator and use that
++    if (false && get_external_enumerator() != nullptr && subtree.empty() && target_coord.empty())
++    {
++      #ifdef PRINT_OUT
++      std::cout << std::string(2 * print_out_lvl, ' ') << "using external enumerator" << std::endl;
++      #endif
++      if (enumext.get() == nullptr)
++        enumext.reset(new ExternalEnumeration<ZT, FT>(_gso, _evaluator));
++      if (enumext->enumerate(first, last, fmaxdist, fmaxdistexpo, pruning, dual))
++      {
++        _nodes = enumext->get_nodes_array();
++        #ifdef PRINT_OUT
++        std::cout << std::string(2 * --print_out_lvl, ' ') << "< Enumeration::enumerate" << std::endl;
++        #endif
++        return;
++      }
++    }
++    // if external enumerator is not available, not possible or when it fails then fall through to
++    // fplll enumeration
++    #ifdef PRINT_OUT
++    std::cout << std::string(2 * print_out_lvl, ' ') << "using fplll enumerator" << std::endl;
++    #endif
++    if (enumdyn.get() == nullptr)
++      enumdyn.reset(new EnumerationDyn<ZT, FT>(_gso, _evaluator, _max_indices));
++
++    std::ostringstream gso_string;
++    FT bi_star_2;
++    gso_string << std::string("\"gs\": [");
++    for (int __i = 0; __i < _gso.d; __i++) {
++      _gso.get_r(bi_star_2, __i, __i);
++      gso_string << bi_star_2; // squared norm
++      if (__i < _gso.d - 1) {
++        gso_string << std::string(", ");
++      }
++    }
++    gso_string << std::string("],\n");
++
++    enumdyn->set_subtree_root_level(_subtree_root_level);
++    enumdyn->stats_flags = stats_flags;
++    enumdyn->enumerate(first, last, fmaxdist, fmaxdistexpo, target_coord, subtree, pruning, dual,
++                       subtree_reset);
++    _nodes = enumdyn->get_nodes_array();
++
++    bool my_resetflag = !_max_indices.empty();
++    if (!dual && !my_resetflag) {
++      tree_s = enumdyn->get_tree();
++      vals_s = enumdyn->get_tree_degrees();
++      tree_stats_s = enumdyn->get_tree_stats(pruning, gso_string.str());
++      subtree_stats_s = enumdyn->get_subtree_stats();
++    }
++
++    #ifdef PRINT_OUT
++    std::cout << "tree_s = " << tree_s << std::endl;
++    std::cout << "tree_stats_s = " << tree_stats_s << std::endl;
++    std::cout << "subtree_stats_s = " << subtree_stats_s << std::endl;
++    std::cout << "vals_s = " << vals_s << std::endl;
++    std::cout << std::string(2 * --print_out_lvl, ' ') << "< Enumeration::enumerate" << std::endl;
++    #endif
++  }
++
++void free_TPTree(TPNode *root){
++  if (!root) {
++    return;
++  }
++  for (TPNode* child : root->children) {
++    free_TPTree(child);
++  }
++  delete root;
+ }
+ 
+ template <typename ZT, typename FT>
+ void EnumerationDyn<ZT, FT>::prepare_enumeration(const vector<enumxt> &subtree, bool solvingsvp,
+                                                  bool subtree_reset)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::prepare_enumeration" << std::endl;
++  #endif
+   is_svp = solvingsvp;
+ 
+   enumf newdist = 0.0;
+   k_end         = d - subtree.size();
++
++  if (root != NULL) {
++    free_TPTree(root);
++  }
++  if (stats_flags & STATS_DUMP_ENUM_TREES) {
++    root = new TPNode(0, k_end - 1);
++    root->parent = (fplll::TPNode*)0xdeadbeef;
++    cur_node = root;
++  }
++
+   for (k = d - 1; k >= 0 && newdist <= maxdist; --k)
+   {
+     enumf newcenter = center_partsum[k];
+@@ -213,6 +324,9 @@ void EnumerationDyn<ZT, FT>::prepare_enumeration(const vector<enumxt> &subtree,
+     x[0]  = 1;  // Excludes (0,...,0) from the enumeration
+   }
+   ++k;
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::prepare_enumeration" << std::endl;
++  #endif
+ }
+ 
+ template <typename ZT, typename FT> void EnumerationDyn<ZT, FT>::set_bounds()
+@@ -230,27 +344,50 @@ template <typename ZT, typename FT> void EnumerationDyn<ZT, FT>::set_bounds()
+ 
+ template <typename ZT, typename FT> void EnumerationDyn<ZT, FT>::process_solution(enumf newmaxdist)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::process_solution" << std::endl;
++  #endif
+   FPLLL_TRACE("Sol dist: " << newmaxdist << " (nodes:" << get_nodes() << ")");
+   for (int j = 0; j < d; ++j)
+     fx[j] = x[j];
+   _evaluator.eval_sol(fx, newmaxdist, maxdist);
+ 
+   set_bounds();
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::process_solution" << std::endl;
++  #endif
+ }
+ 
+ template <typename ZT, typename FT>
+ void EnumerationDyn<ZT, FT>::process_subsolution(int offset, enumf newdist)
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::process_subsolution" << std::endl;
++  #endif
+   for (int j = 0; j < offset; ++j)
+     fx[j] = 0.0;
+   for (int j = offset; j < d; ++j)
+     fx[j] = x[j];
+   _evaluator.eval_sub_sol(offset, fx, newdist);
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::process_subsolution" << std::endl;
++  #endif
+ }
+ 
+ template <typename ZT, typename FT> void EnumerationDyn<ZT, FT>::do_enumerate()
+ {
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * print_out_lvl++, ' ') << "> EnumerationDyn::do_enumerate" << std::endl;
++  #endif
+   std::fill(nodes.begin(), nodes.end(), 0);
++  std::fill(nodes_subtree_avg.begin(), nodes_subtree_avg.end(), 0);
++  std::fill(nodes_subtree_second_moment.begin(), nodes_subtree_second_moment.end(), 0);
++  std::fill(nodes_cur_subtree.begin(), nodes_cur_subtree.end(), 0);
++  subtrees_visited_so_far = 0;
++  size_subtree_avg = 0;
++  sqrt_size_subtree_avg = 0;
++  sqr_size_subtree_avg = 0;
++  subtree_samp_var = 0;
+ 
+   set_bounds();
+ 
+@@ -266,6 +403,10 @@ template <typename ZT, typename FT> void EnumerationDyn<ZT, FT>::do_enumerate()
+     enumerate_loop<false, true, true>();
+   else if (!dual && !_evaluator.findsubsols && resetflag)
+     enumerate_loop<false, false, true>();
++
++  #ifdef PRINT_OUT
++  std::cout << std::string(2 * --print_out_lvl, ' ') << "< EnumerationDyn::do_enumerate" << std::endl;
++  #endif
+ }
+ 
+ template class Enumeration<Z_NR<mpz_t>, FP_NR<double>>;

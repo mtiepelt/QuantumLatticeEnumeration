@@ -1,0 +1,128 @@
+diff --git a/fplll/enum/enumerate.h b/fplll/enum/enumerate.h
+index 2361c6a3..74fd6ac8 100644
+--- a/fplll/enum/enumerate.h
++++ b/fplll/enum/enumerate.h
+@@ -19,6 +19,7 @@
+ #ifndef FPLLL_ENUMERATE_H
+ #define FPLLL_ENUMERATE_H
+ 
++#include "defs.h"
+ #include <array>
+ #include <fplll/enum/enumerate_base.h>
+ #include <fplll/enum/enumerate_ext.h>
+@@ -26,17 +27,34 @@
+ #include <fplll/gso_interface.h>
+ #include <memory>
+ 
++
++// #define PRINT_OUT
++#ifdef PRINT_OUT
++static int print_out_lvl = 0;
++#endif
++
+ FPLLL_BEGIN_NAMESPACE
+ 
+ template <typename ZT, typename FT> class EnumerationDyn : public EnumerationBase
+ {
+ public:
+   EnumerationDyn(MatGSOInterface<ZT, FT> &gso, Evaluator<FT> &evaluator,
+-                 const vector<int> &max_indices = vector<int>())
++                 const vector<int> &max_indices = vector<int>(), int subtree_root_level = -1)
+       : _gso(gso), _evaluator(evaluator)
+   {
++    stats_flags = 0;
++    root = NULL;
+     _max_indices = max_indices;
++    _subtree_root_level = subtree_root_level;
++    subtrees_visited_so_far = 0;
+     std::fill(nodes.begin(), nodes.end(), 0);
++    std::fill(nodes_subtree_avg.begin(), nodes_subtree_avg.end(), 0);
++    std::fill(nodes_subtree_second_moment.begin(), nodes_subtree_second_moment.end(), 0);
++    std::fill(nodes_cur_subtree.begin(), nodes_cur_subtree.end(), 0);
++    size_subtree_avg = 0;
++    sqrt_size_subtree_avg = 0;
++    sqr_size_subtree_avg = 0;
++    subtree_samp_var = 0;
+   }
+ 
+   void enumerate(int first, int last, FT &fmaxdist, long fmaxdistexpo,
+@@ -78,36 +96,23 @@ private:
+ template <typename ZT, typename FT> class Enumeration
+ {
+ public:
++  int stats_flags;
++
+   Enumeration(MatGSOInterface<ZT, FT> &gso, Evaluator<FT> &evaluator,
+               const vector<int> &max_indices = vector<int>())
+-      : _gso(gso), _evaluator(evaluator), _max_indices(max_indices), enumdyn(nullptr), _nodes{}
++      : _gso(gso), _evaluator(evaluator), _max_indices(max_indices), enumdyn(nullptr), _nodes{} //, _nodes_subtree_avg{}, _nodes_subtree_var{}
+   {
++    stats_flags = 0;
+   }
+ 
+   void enumerate(int first, int last, FT &fmaxdist, long fmaxdistexpo,
+                  const vector<FT> &target_coord = vector<FT>(),
+                  const vector<enumxt> &subtree  = vector<enumxt>(),
+                  const vector<enumf> &pruning = vector<enumf>(), bool dual = false,
+-                 bool subtree_reset = false)
+-  {
+-    // check for external enumerator and use that
+-    if (get_external_enumerator() != nullptr && subtree.empty() && target_coord.empty())
+-    {
+-      if (enumext.get() == nullptr)
+-        enumext.reset(new ExternalEnumeration<ZT, FT>(_gso, _evaluator));
+-      if (enumext->enumerate(first, last, fmaxdist, fmaxdistexpo, pruning, dual))
+-      {
+-        _nodes = enumext->get_nodes_array();
+-        return;
+-      }
+-    }
+-    // if external enumerator is not available, not possible or when it fails then fall through to
+-    // fplll enumeration
+-    if (enumdyn.get() == nullptr)
+-      enumdyn.reset(new EnumerationDyn<ZT, FT>(_gso, _evaluator, _max_indices));
+-    enumdyn->enumerate(first, last, fmaxdist, fmaxdistexpo, target_coord, subtree, pruning, dual,
+-                       subtree_reset);
+-    _nodes = enumdyn->get_nodes_array();
++                 bool subtree_reset = false);
++
++  inline void set_subtree_root_level(const int subtree_root_level) {
++    _subtree_root_level = subtree_root_level;
+   }
+ 
+   inline uint64_t get_nodes(const int level = -1) const
+@@ -117,6 +122,22 @@ public:
+     return _nodes[level];
+   }
+ 
++  inline std::string get_tree_degrees() {
++    return vals_s;
++  }
++
++  inline std::string get_tree() {
++    return tree_s;
++  }
++
++  inline std::string get_tree_stats() {
++    return tree_stats_s;
++  }
++
++  inline std::string get_subtree_stats() {
++    return subtree_stats_s;
++  }
++
+   inline array<uint64_t, FPLLL_EXTENUM_MAX_EXTENUM_DIM> get_nodes_array() const { return _nodes; }
+ 
+ private:
+@@ -126,6 +147,11 @@ private:
+   std::unique_ptr<EnumerationDyn<ZT, FT>> enumdyn;
+   std::unique_ptr<ExternalEnumeration<ZT, FT>> enumext;
+   array<uint64_t, FPLLL_EXTENUM_MAX_EXTENUM_DIM> _nodes;
++  std::string tree_s;
++  std::string tree_stats_s;
++  std::string vals_s;
++  std::string subtree_stats_s;
++  int _subtree_root_level;
+ };
+ 
+ FPLLL_END_NAMESPACE

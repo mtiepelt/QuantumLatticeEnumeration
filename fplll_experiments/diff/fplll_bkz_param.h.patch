@@ -1,0 +1,39 @@
+diff --git a/fplll/bkz_param.h b/fplll/bkz_param.h
+index ff0bfa5c..43da3a5f 100644
+--- a/fplll/bkz_param.h
++++ b/fplll/bkz_param.h
+@@ -117,8 +117,9 @@ public:
+       : block_size(block_size), strategies(strategies), delta(delta), flags(flags),
+         max_loops(max_loops), max_time(max_time), auto_abort_scale(auto_abort_scale),
+         auto_abort_max_no_dec(auto_abort_max_no_dec), gh_factor(gh_factor),
+-        dump_gso_filename("gso.json"), min_success_probability(min_success_probability),
+-        rerandomization_density(rerandomization_density)
++        dump_gso_filename("gso.json"), dump_enum_trees("tree.json"),
++        dump_enum_tree_stats("tree_stats.json"), subtree_root_level(-1), subtree_stats_filename("subtree_stats.json"),
++        min_success_probability(min_success_probability), rerandomization_density(rerandomization_density)
+   {
+ 
+     // we create dummy strategies
+@@ -166,6 +167,22 @@ public:
+   */
+   string dump_gso_filename;
+ 
++  /** If BKZ_DUMP_ENUM_TREES is set, the enumeration trees of every svp call are written to this
++      file after reduction.
++  */
++  string dump_enum_trees;
++
++  /** If BKZ_DUMP_ENUM_TREE_STATS is set, the enumeration tree stats of every svp call are written to this
++      file after reduction.
++  */
++  string dump_enum_tree_stats;
++
++   /** If BKZ_SUBTREE_ROOT_LEVEL and BKZ_SUBTREE_STATS_FILENAME are set, the subtrees considered for statistics
++       will be rooted at this level and the results will be written to this filename.
++   */
++  int subtree_root_level;
++  string subtree_stats_filename;
++
+   /** minimum success probability when using extreme pruning */
+ 
+   double min_success_probability;

@@ -1,0 +1,15 @@
+diff --git a/fplll/main.h b/fplll/main.h
+index 4018ba70..1cd86784 100644
+--- a/fplll/main.h
++++ b/fplll/main.h
+@@ -76,6 +76,10 @@ struct Options
+   double prune_min_prob;
+   double bkz_max_time;
+   string bkz_dump_gso_filename;
++  string bkz_dump_enum_trees;
++  string bkz_dump_enum_tree_stats;
++  int bkz_subtree_root_level;
++  string bkz_subtree_stats_filename;
+   double bkz_gh_factor;
+   string bkz_strategy_file;
+ 

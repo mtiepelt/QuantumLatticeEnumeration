@@ -1,0 +1,12 @@
+# params: LWE.n, LWE.q, LWE.sd, LWE.m, BKZ.beta, BKZ.tours, BKZ.gh_bound, LWE.prng_seed, BKZ.subtree_root_level(=k)
+
+# Toy experiment for prototyping an debuggin
+# ./enum_subtree_size.sh 72 97 1.0 87 10 1 1.1 1337 5
+
+# Experiment used in Fig 6.a, 7.a, 8.a
+./enum_subtree_size.sh 72 97 1.0 87 40 15 1.1 1337 10
+
+# Experiment used in Fig 6.b, 7.b, 8.b
+./enum_subtree_size.sh 72 97 1.0 87 40 15 1.1 1337 20
+
+# Fig 5 can be generated with either instance.

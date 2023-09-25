@@ -1,0 +1,32 @@
+# Very small experiment for prototyping
+# ./enum_ub_exp.sh 72 97 1.0 87 10 1 1.1 1337
+
+# Small experiment
+# ./enum_ub_exp.sh 72 97 1.0 87 20 15 1.1 1337
+
+# Larger experiments
+
+# ./enum_ub_exp.sh 72 97 1.0 87 20 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 30 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 40 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 50 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 60 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 70 15 1.1 1337
+# ./enum_ub_exp.sh 72 97 1.0 87 80 15 1.1 1337
+
+# ./enum_ub_exp.sh 93 257 1.0 105 20 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 30 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 40 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 50 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 60 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 70 15 1.1 1337
+# ./enum_ub_exp.sh 93 257 1.0 105 80 15 1.1 1337
+
+# ./enum_ub_exp.sh 100 257 0.816 104 20 15 1.1 1337
+# ./enum_ub_exp.sh 100 257 0.816 104 30 15 1.1 1337
+# ./enum_ub_exp.sh 100 257 0.816 104 40 15 1.1 1337
+# ./enum_ub_exp.sh 100 257 0.816 104 50 15 1.1 1337
+./enum_ub_exp.sh 100 257 0.816 104 60 15 1.1 1337
+# ./enum_ub_exp.sh 100 257 0.816 104 70 15 1.1 1337
+# ./enum_ub_exp.sh 100 257 0.816 104 80 15 1.1 1337
+

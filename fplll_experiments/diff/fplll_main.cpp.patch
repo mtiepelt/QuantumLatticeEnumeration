@@ -1,0 +1,67 @@
+diff --git a/fplll/main.cpp b/fplll/main.cpp
+index 13e062e7..d1bea98d 100644
+--- a/fplll/main.cpp
++++ b/fplll/main.cpp
+@@ -142,6 +142,14 @@ template <> int bkz(Options &o, ZZ_mat<mpz_t> &b)
+ 
+   if (o.bkz_flags & BKZ_DUMP_GSO)
+     param.dump_gso_filename = o.bkz_dump_gso_filename;
++  if (o.bkz_flags & BKZ_DUMP_ENUM_TREES)
++    param.dump_enum_trees = o.bkz_dump_enum_trees;
++  if (o.bkz_flags & BKZ_DUMP_ENUM_TREE_STATS)
++    param.dump_enum_tree_stats = o.bkz_dump_enum_tree_stats;
++  if ((o.bkz_flags & BKZ_SUBTREE_ROOT_LEVEL) && ((o.bkz_flags & BKZ_SUBTREE_STATS_FILENAME))) {
++    param.subtree_root_level = o.bkz_subtree_root_level-1; // paper counts from 1, fplll counts from 0
++    param.subtree_stats_filename = o.bkz_subtree_stats_filename;
++  }
+   if (o.bkz_flags & BKZ_GH_BND)
+     param.gh_factor = o.bkz_gh_factor;
+   if (o.bkz_flags & BKZ_MAX_LOOPS)
+@@ -568,6 +576,34 @@ void read_options(int argc, char **argv, Options &o)
+       o.bkz_dump_gso_filename = argv[ac];
+       o.bkz_flags |= BKZ_DUMP_GSO;
+     }
++    else if (strcmp(argv[ac], "-bkzdumpenumtrees") == 0)
++    {
++      ++ac;
++      CHECK(ac < argc, "missing filename after -bkzdumpenumtrees switch")
++      o.bkz_dump_enum_trees = argv[ac];
++      o.bkz_flags |= BKZ_DUMP_ENUM_TREES;
++    }
++    else if (strcmp(argv[ac], "-bkzdumpenumtreestats") == 0)
++    {
++      ++ac;
++      CHECK(ac < argc, "missing filename after -bkzdumptreestats switch")
++      o.bkz_dump_enum_tree_stats = argv[ac];
++      o.bkz_flags |= BKZ_DUMP_ENUM_TREE_STATS;
++    }
++    else if (strcmp(argv[ac], "-bkzsubtreerootlevel") == 0)
++    {
++      ++ac;
++      CHECK(ac < argc, "missing value after -bkzsubtreerootlevel switch")
++      o.bkz_subtree_root_level = atoi(argv[ac]);
++      o.bkz_flags |= BKZ_SUBTREE_ROOT_LEVEL;
++    }
++    else if (strcmp(argv[ac], "-bkzsubtreestatsfilename") == 0)
++    {
++      ++ac;
++      CHECK(ac < argc, "missing filename after -bkzsubtreestatsfilename switch")
++      o.bkz_subtree_stats_filename = argv[ac];
++      o.bkz_flags |= BKZ_SUBTREE_STATS_FILENAME;
++    }
+     else if (strcmp(argv[ac], "-c") == 0 || strcmp(argv[ac], "-r") == 0)
+     {
+       ++ac;
+@@ -744,6 +780,12 @@ void read_options(int argc, char **argv, Options &o)
+            << "        Restricts the LLL call\n"
+            << "  -bkzdumpgso <file_name>\n"
+            << "        Dumps the log of the Gram-Schmidt vectors in specified file\n"
++           << "  -bkzdumpenumtrees <file_name>\n"
++           << "        Dumps the enumeration trees in specified file\n"
++           << "  -bkzdumpenumtreestats <file_name>\n"
++           << "        Dumps the enumeration tree stats in specified file\n"
++           << "  -bkzsubtreerootlevel <file_name>\n"
++           << "        Value of k (from 0 to n-1) to collect statistics of subtrees rooted at\n"
+            << "  -of [b|c|s|t|u|v|bk|uk|vk]\n"
+            << "        Output formats.\n"
+ 

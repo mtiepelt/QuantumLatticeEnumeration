@@ -1,0 +1,140 @@
+diff --git a/fplll/enum/enumerate_base.h b/fplll/enum/enumerate_base.h
+index 259e2c02..091ddceb 100644
+--- a/fplll/enum/enumerate_base.h
++++ b/fplll/enum/enumerate_base.h
+@@ -19,6 +19,7 @@
+ #ifndef FPLLL_ENUMERATE_BASE_H
+ #define FPLLL_ENUMERATE_BASE_H
+ 
++#include "defs.h"
+ #include "fplll/enum/enumerate_ext_api.h"
+ #include "fplll/fplll_config.h"
+ #include "fplll/nr/nr.h"
+@@ -27,6 +28,8 @@
+ #include <cmath>
+ #include <numeric>
+ #include <vector>
++#include <iostream>
++#include <cassert>
+ 
+ FPLLL_BEGIN_NAMESPACE
+ 
+@@ -53,10 +56,50 @@ inline void roundto(double &dest, const double &src) { dest = round(src); }
+ #define ENUM_ALWAYS_INLINE ALWAYS_INLINE
+ #endif
+ 
++// https://www.tutorialspoint.com/n-ary-tree-level-order-traversal-in-cplusplus
++class TPNode {
++  public:
++  int val;
++  int lvl;
++  std::vector<TPNode*> children;
++  TPNode *parent;
++
++  TPNode() {
++    val = 0;
++    lvl = 0;
++  }
++  TPNode(int _val, int _lvl) {
++    val = _val;
++    lvl = _lvl;
++  }
++  // TPNode(int _val, std::vector<TPNode*> _children) {
++  //   val = _val;
++  //   children = _children;
++  // }
++  TPNode (int _val, int _lvl, TPNode *_parent) {
++    val = _val;
++    lvl = _lvl;
++    parent = _parent;
++  }
++  TPNode *push_child(int _val, int _lvl) {
++    TPNode *_child = new TPNode(_val, _lvl, this);
++    children.push_back(_child);
++    return _child;
++  }
++};
++
+ class EnumerationBase
+ {
+ public:
++  TPNode *root; // enumeration tree root
++  TPNode *cur_node; // current node
+   static const int maxdim = FPLLL_MAX_ENUM_DIM;
++  int stats_flags;
++
++  std::string get_tree_degrees();
++  std::string get_tree();
++  std::string get_tree_stats(const vector<enumf> &pruning, std::basic_string<char> gso_string);
++  std::string get_subtree_stats();
+ 
+   inline uint64_t get_nodes(const int level = -1) const
+   {
+@@ -67,6 +110,11 @@ public:
+ 
+     return nodes[level];
+   }
++  
++  inline void set_subtree_root_level(const int subtree_root_level) {
++    _subtree_root_level = subtree_root_level;
++  }
++
+   virtual ~EnumerationBase() {}
+ 
+ protected:
+@@ -99,6 +147,17 @@ protected:
+ 
+   /* nodes count */
+   array<uint64_t, FPLLL_EXTENUM_MAX_EXTENUM_DIM> nodes;
++  int _subtree_root_level;
++  array<uint64_t, FPLLL_EXTENUM_MAX_EXTENUM_DIM> nodes_cur_subtree;
++  uint64_t subtrees_visited_so_far;
++  double size_subtree_avg;
++  double sqrt_size_subtree_avg;
++  double sqr_size_subtree_avg;
++  double subtree_samp_var;
++  array<double, FPLLL_EXTENUM_MAX_EXTENUM_DIM> nodes_subtree_avg;
++  array<double, FPLLL_EXTENUM_MAX_EXTENUM_DIM> nodes_subtree_second_moment;
++  array<double, FPLLL_EXTENUM_MAX_EXTENUM_DIM> avg_children;
++  array<double, FPLLL_EXTENUM_MAX_EXTENUM_DIM> var_children;
+ 
+   template <int kk, int kk_start, bool dualenum, bool findsubsols, bool enable_reset> struct opts
+   {
+@@ -144,6 +203,11 @@ protected:
+ 
+   inline bool next_pos_up()
+   {
++    #ifdef PRINT_OUT
++    std::cout << "> EnumerationBase::next_pos_up " << k << " -> " << k << std::endl;
++    #endif
++    // assert(cur_node->parent != (fplll::TPNode*)0xdeadbeef);
++    // cur_node = cur_node->parent;
+     ++k;
+     if (partdist[k] != 0.0)
+     {
+@@ -154,7 +218,15 @@ protected:
+     else
+     {
+       if (k >= k_end)
++      {
++        #ifdef PRINT_OUT
++        std::cout << "< EnumerationBase::next_pos_up (false)" << std::endl;
++        #endif
+         return false;
++      }
++      #ifdef PRINT_OUT
++      std::cout << "resetting k_max to " << k << std::endl;
++      #endif
+       k_max = k;
+       if (is_svp)
+       {
+@@ -168,6 +240,9 @@ protected:
+         dx[k]  = ddx[k] - dx[k];
+       }
+     }
++    #ifdef PRINT_OUT
++    std::cout << "< EnumerationBase::next_pos_up (true)" << std::endl;
++    #endif
+     return true;
+   }
+ };

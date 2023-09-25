@@ -1,0 +1,12 @@
+# params: LWE.n, LWE.q, LWE.sd, LWE.m, BKZ.beta, BKZ.tours, BKZ.gh_bound, LWE.prng_seed, BKZ.subtree_root_level(=k)
+
+# Toy example for debugging purposes
+# ./enum_subtree_jensen.sh 72 97 1.0 87 40 1 1.1 1337 20
+
+# Instances used in App C and G
+./enum_subtree_jensen.sh 72 97 1.0 87 50 15 1.1 1337 20
+./enum_subtree_jensen.sh 72 97 1.0 87 50 15 1.1 1337 30
+./enum_subtree_jensen.sh 72 97 1.0 87 60 15 1.1 1337 20
+./enum_subtree_jensen.sh 72 97 1.0 87 60 15 1.1 1337 30
+./enum_subtree_jensen.sh 72 97 1.0 87 70 10 1.1 1337 20
+./enum_subtree_jensen.sh 72 97 1.0 87 70 10 1.1 1337 30

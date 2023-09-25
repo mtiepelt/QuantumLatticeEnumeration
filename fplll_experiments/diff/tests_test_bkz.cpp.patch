@@ -1,0 +1,139 @@
+diff --git a/tests/test_bkz.cpp b/tests/test_bkz.cpp
+index a2d6b2fe..dca68e1e 100644
+--- a/tests/test_bkz.cpp
++++ b/tests/test_bkz.cpp
+@@ -161,6 +161,7 @@ int test_bkz_param_pruning(ZZ_mat<ZT> &A, const int block_size, int flags = BKZ_
+   vector<Strategy> strategies = load_strategies_json(TESTDATADIR "/strategies/default.json");
+   BKZParam params(block_size, strategies);
+   params.flags = flags;
++  params.subtree_root_level = 3;
+   // zero on success
+   status = bkz_reduction(&A, NULL, params, FT_DEFAULT, 53);
+   if (status != RED_SUCCESS)
+@@ -276,8 +277,9 @@ int test_filename(const char *input_filename, const int block_size,
+   int status = 0;
+   status |= read_file(A, input_filename);
+   B = A;
+-  status |= test_bkz<ZT>(A, block_size, float_type, flags, prec);
+-  status |= test_bkz_param<ZT>(B, block_size);
++  // status |= test_bkz<ZT>(A, block_size, float_type, flags, prec);
++  // status |= test_bkz_param<ZT>(B, block_size);
++  status |= test_bkz_param_pruning<ZT>(B, block_size, flags);
+   return status;
+ }
+ 
+@@ -322,60 +324,60 @@ int main(int /*argc*/, char ** /*argv*/)
+ 
+   int status = 0;
+ 
+-  status |= test_linear_dep();
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 10, FT_DEFAULT,
+-                                 BKZ_DEFAULT | BKZ_AUTO_ABORT);
+-#ifdef FPLLL_WITH_QD
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 10, FT_DD,
+-                                 BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
+-#endif
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 10, FT_DEFAULT, BKZ_SLD_RED);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR,
+-                                 BKZ_DEFAULT | BKZ_AUTO_ABORT, 128);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR,
+-                                 BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 128);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR, BKZ_SLD_RED, 128);
+-
+-  status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_DEFAULT | BKZ_AUTO_ABORT);
+-  status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
+-  status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_SLD_RED);
+-  status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_DEFAULT | BKZ_AUTO_ABORT, 100);
+-  status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 100);
+-  status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_SLD_RED, 100);
+-
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_DEFAULT | BKZ_AUTO_ABORT);
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_SLD_RED);
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_DEFAULT | BKZ_AUTO_ABORT, 53);
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 53);
+-  status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_SLD_RED, 53);
+-
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DEFAULT,
+-                                 BKZ_SD_VARIANT);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DEFAULT, BKZ_SLD_RED);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SD_VARIANT);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SLD_RED);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
+-                                 BKZ_AUTO_ABORT, 212);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
+-                                 BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 212);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
+-                                 BKZ_SLD_RED | BKZ_AUTO_ABORT, 212);
+-  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SD_VARIANT);
+-  status |=
+-      test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SLD_RED);
+-
+-  // Test BKZ_DUMP_GSO
+-  status |= test_int_rel_bkz_dump_gso<mpz_t>(50, 1000, 15, BKZ_DEFAULT | BKZ_DUMP_GSO);
++  // status |= test_linear_dep();
++  status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_DEFAULT,
++                                 BKZ_DEFAULT | BKZ_AUTO_ABORT | BKZ_DUMP_ENUM_TREES | BKZ_DUMP_ENUM_TREE_STATS | BKZ_SUBTREE_ROOT_LEVEL | BKZ_SUBTREE_STATS_FILENAME | BKZ_DUMP_GSO );
++// #ifdef FPLLL_WITH_QD
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 10, FT_DD,
++//                                  BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
++// #endif
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 10, FT_DEFAULT, BKZ_SLD_RED);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR,
++//                                  BKZ_DEFAULT | BKZ_AUTO_ABORT, 128);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR,
++//                                  BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 128);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/dim55_in", 20, FT_MPFR, BKZ_SLD_RED, 128);
++
++//   status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_DEFAULT | BKZ_AUTO_ABORT);
++//   status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
++//   status |= test_int_rel<mpz_t>(50, 1000, 10, FT_DOUBLE, BKZ_SLD_RED);
++//   status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_DEFAULT | BKZ_AUTO_ABORT, 100);
++//   status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 100);
++//   status |= test_int_rel<mpz_t>(50, 1000, 15, FT_MPFR, BKZ_SLD_RED, 100);
++
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_DEFAULT | BKZ_AUTO_ABORT);
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_SD_VARIANT | BKZ_AUTO_ABORT);
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_DPE, BKZ_SLD_RED);
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_DEFAULT | BKZ_AUTO_ABORT, 53);
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 53);
++//   status |= test_int_rel<mpz_t>(30, 2000, 10, FT_MPFR, BKZ_SLD_RED, 53);
++
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DEFAULT,
++//                                  BKZ_SD_VARIANT);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DEFAULT, BKZ_SLD_RED);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SD_VARIANT);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SLD_RED);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
++//                                  BKZ_AUTO_ABORT, 212);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
++//                                  BKZ_SD_VARIANT | BKZ_AUTO_ABORT, 212);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_MPFR,
++//                                  BKZ_SLD_RED | BKZ_AUTO_ABORT, 212);
++//   status |= test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SD_VARIANT);
++//   status |=
++//       test_filename<mpz_t>(TESTDATADIR "/tests/lattices/example_in", 10, FT_DOUBLE, BKZ_SLD_RED);
++
++//   // Test BKZ_DUMP_GSO
++//   status |= test_int_rel_bkz_dump_gso<mpz_t>(50, 1000, 15, BKZ_DEFAULT | BKZ_DUMP_GSO);
+ 
+   if (status == 0)
+   {

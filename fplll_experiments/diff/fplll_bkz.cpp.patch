@@ -1,0 +1,450 @@
+diff --git a/fplll/bkz.cpp b/fplll/bkz.cpp
+index 82a34e8a..1f2eda66 100644
+--- a/fplll/bkz.cpp
++++ b/fplll/bkz.cpp
+@@ -30,7 +30,7 @@ template <class ZT, class FT>
+ BKZReduction<ZT, FT>::BKZReduction(MatGSOInterface<ZT, FT> &m, LLLReduction<ZT, FT> &lll_obj,
+                                    const BKZParam &param)
+     : status(RED_SUCCESS), nodes(0), param(param), m(m), lll_obj(lll_obj), algorithm(NULL),
+-      cputime_start(0)
++      cputime_start(0), enumeration_trees("")
+ {
+   for (num_rows = m.d; num_rows > 0 && m.b_row_is_zero(num_rows - 1); num_rows--)
+   {
+@@ -296,11 +296,14 @@ bool BKZReduction<ZT, FT>::svp_reduction(int kappa, int block_size, const BKZPar
+ 
+   bool rerandomize             = false;
+   double remaining_probability = 1.0;
++  int try_at_cur_block = -1;
+ 
+   while (remaining_probability > 1. - par.min_success_probability)
+   {
++    try_at_cur_block++;
+     if (rerandomize)
+     {
++      std::cerr << "rerandomizing at index " << kappa << std::endl;
+       rerandomize_block(kappa + 1, kappa + block_size, par.rerandomization_density);
+     }
+ 
+@@ -327,9 +330,109 @@ bool BKZReduction<ZT, FT>::svp_reduction(int kappa, int block_size, const BKZPar
+     FPLLL_DEBUG_CHECK(pruning.metric == PRUNER_METRIC_PROBABILITY_OF_SHORTEST)
+     evaluator.solutions.clear();
+     Enumeration<ZT, FT> enum_obj(m, evaluator);
++    if (par.flags & BKZ_DUMP_ENUM_TREE_STATS) enum_obj.stats_flags |= STATS_DUMP_ENUM_TREE_STATS;
++    if (par.flags & BKZ_DUMP_ENUM_TREES) enum_obj.stats_flags |= STATS_DUMP_ENUM_TREES;
++    if ((par.flags & BKZ_SUBTREE_ROOT_LEVEL) && (par.flags & BKZ_SUBTREE_STATS_FILENAME)) enum_obj.stats_flags |= STATS_DUMP_SUBTREE_STATS;
++    enum_obj.set_subtree_root_level(param.subtree_root_level);
+     enum_obj.enumerate(kappa, kappa + block_size, max_dist, max_dist_expo, vector<FT>(),
+                        vector<enumxt>(), pruning.coefficients, dual);
+     nodes += enum_obj.get_nodes();
++    if (par.flags & BKZ_DUMP_ENUM_TREES)
++    {
++      enumeration_trees += std::string("\"") + to_string(kappa) + std::string("-") + to_string(try_at_cur_block) + std::string("\": ") + enum_obj.get_tree();
++      // std::cout << "\"" << kappa << "\": " << enum_obj.get_tree();
++      if (block_size > 2) {
++        enumeration_trees += std::string(",");
++        // std::cout << ",";
++      }
++      enumeration_trees += std::string("\n");
++      // std::cout << std::endl;
++    }
++
++    if (par.flags & BKZ_DUMP_ENUM_TREE_STATS)
++    {
++      // enumeration_tree_stats += std::string("\"") + to_string(kappa) + std::string("\": ") + enum_obj.get_tree_stats();
++      // std::cout << "\"" << kappa << "\": " << enum_obj.get_tree();
++
++      try
++      {
++        enumeration_tree_stats_dump << std::string("\"") + to_string(kappa) + std::string("-") + to_string(try_at_cur_block) + std::string("\": ") + enum_obj.get_tree_stats();
++      }
++      catch (const ios_base::failure &e)
++      {
++        cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++        throw;
++      }
++
++      if (block_size > 2) {
++        // enumeration_tree_stats += std::string(",");
++        // std::cout << ",";
++
++        try
++        {
++          enumeration_tree_stats_dump << std::string(",");
++        }
++        catch (const ios_base::failure &e)
++        {
++          cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++          throw;
++        }
++      }
++      // enumeration_tree_stats += std::string("\n");
++      // std::cout << std::endl;
++
++      try
++      {
++        enumeration_tree_stats_dump << std::string("\n");
++      }
++      catch (const ios_base::failure &e)
++      {
++        cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++        throw;
++      }
++    }
++    if (par.flags & BKZ_SUBTREE_STATS_FILENAME)
++    {
++      // enumeration_tree_stats += std::string("\"") + to_string(kappa) + std::string("\": ") + enum_obj.get_tree_stats();
++      // std::cout << "\"" << kappa << "\": " << enum_obj.get_tree();
++
++      try
++      {
++        enumeration_subtree_stats_dump << std::string("\"") + to_string(kappa) + std::string("-") + to_string(try_at_cur_block) + std::string("\": ") + enum_obj.get_subtree_stats();
++      }
++      catch (const ios_base::failure &e)
++      {
++        cerr << "Cannot open " << param.subtree_stats_filename << endl;
++        throw;
++      }
++
++      if (block_size > 2) {
++        // enumeration_tree_stats += std::string(",");
++        // std::cout << ",";
++
++        try
++        {
++          enumeration_subtree_stats_dump << std::string(",");
++        }
++        catch (const ios_base::failure &e)
++        {
++          cerr << "Cannot open " << param.subtree_stats_filename << endl;
++          throw;
++        }
++      }
++      // enumeration_tree_stats += std::string("\n");
++      // std::cout << std::endl;
++
++      try
++      {
++        enumeration_subtree_stats_dump << std::string("\n");
++      }
++      catch (const ios_base::failure &e)
++      {
++        cerr << "Cannot open " << param.subtree_stats_filename << endl;
++        throw;
++      }
++    }
+ 
+     if (!evaluator.empty())
+     {
+@@ -362,8 +465,75 @@ bool BKZReduction<ZT, FT>::tour(const int loop, int &kappa_max, const BKZParam &
+                                 int max_row)
+ {
+   bool clean = true;
++
++  if (par.flags & BKZ_DUMP_ENUM_TREES)
++  {
++    enumeration_trees += std::string("{");
++    // std::cout << "{";
++  }
++  if (par.flags & BKZ_DUMP_ENUM_TREE_STATS)
++  {
++    // enumeration_tree_stats += std::string("{");
++    // std::cout << "{";
++    try
++    {
++      enumeration_tree_stats_dump << std::string("{");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++      throw;
++    }
++  }
++  if (par.flags & BKZ_SUBTREE_STATS_FILENAME)
++  {
++    // enumeration_tree_stats += std::string("{");
++    // std::cout << "{";
++    try
++    {
++      enumeration_subtree_stats_dump << std::string("{");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.subtree_stats_filename << endl;
++      throw;
++    }
++  }
+   clean &= trunc_tour(kappa_max, par, min_row, max_row);
+   clean &= hkz(kappa_max, par, max(max_row - par.block_size, 0), max_row);
++  if (par.flags & BKZ_DUMP_ENUM_TREES)
++  {
++    enumeration_trees += std::string("}\n");
++    // std::cout << "}" << std::endl;
++  }
++  if (par.flags & BKZ_DUMP_ENUM_TREE_STATS)
++  {
++    // enumeration_tree_stats += std::string("}\n");
++    // std::cout << "}" << std::endl;
++    try
++    {
++      enumeration_tree_stats_dump << std::string("}\n");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++      throw;
++    }
++  }
++  if (par.flags & BKZ_SUBTREE_STATS_FILENAME)
++  {
++    // enumeration_tree_stats += std::string("}\n");
++    // std::cout << "}" << std::endl;
++    try
++    {
++      enumeration_subtree_stats_dump << std::string("}\n");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.subtree_stats_filename << endl;
++      throw;
++    }
++  }
+ 
+   if (par.flags & BKZ_VERBOSE)
+   {
+@@ -570,6 +740,30 @@ template <class ZT, class FT> bool BKZReduction<ZT, FT>::bkz()
+     sld_potential = m.get_slide_potential(0, num_rows, param.block_size);
+   }
+ 
++  // Enable exceptions
++  enumeration_tree_stats_dump.exceptions(ios_base::failbit | ios_base::badbit);
++  enumeration_subtree_stats_dump.exceptions(ios_base::failbit | ios_base::badbit);
++
++  try
++  {
++    enumeration_tree_stats_dump.open(param.dump_enum_tree_stats.c_str());
++  }
++  catch (const ios_base::failure &e)
++  {
++    cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++    throw;
++  }
++  
++  try
++  {
++    enumeration_subtree_stats_dump.open(param.subtree_stats_filename.c_str());
++  }
++  catch (const ios_base::failure &e)
++  {
++    cerr << "Cannot open " << param.subtree_stats_filename << endl;
++    throw;
++  }
++
+   // the following is necessary, since sd-bkz starts with a dual tour and
+   // svp_reduction calls size_reduction, which needs to be preceeded by a
+   // call to lll lower blocks to avoid seg faults
+@@ -578,6 +772,42 @@ template <class ZT, class FT> bool BKZReduction<ZT, FT>::bkz()
+ 
+   int kappa_max = -1;
+   bool clean    = true;
++  if (flags & BKZ_DUMP_ENUM_TREES)
++  {
++    enumeration_trees += std::string("[");
++    // enumeration_trees += std::string("{");
++    // std::cout << "{";
++  }
++  if (flags & BKZ_DUMP_ENUM_TREE_STATS)
++  {
++    // enumeration_tree_stats += std::string("[");
++    // enumeration_trees += std::string("{");
++    // std::cout << "{";
++    try
++    {
++      enumeration_tree_stats_dump << std::string("[");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++      throw;
++    }
++  }
++  if (flags & BKZ_SUBTREE_STATS_FILENAME)
++  {
++    // enumeration_tree_stats += std::string("[");
++    // enumeration_trees += std::string("{");
++    // std::cout << "{";
++    try
++    {
++      enumeration_subtree_stats_dump << std::string("[");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.subtree_stats_filename << endl;
++      throw;
++    }
++  }
+   for (i = 0;; ++i)
+   {
+     if ((flags & BKZ_MAX_LOOPS) && i >= param.max_loops)
+@@ -596,6 +826,55 @@ template <class ZT, class FT> bool BKZReduction<ZT, FT>::bkz()
+       break;
+     }
+ 
++    if (flags & BKZ_DUMP_ENUM_TREES)
++    {
++      if (i > 0)
++      {
++        enumeration_trees += std::string(",\n");
++        // std::cout << "," << std::endl;
++      }
++      // enumeration_trees += std::string("\"") + to_string(i) + std::string("\": \n");
++      // std::cout << "\"" << i << "\": " << std::endl;
++    }
++    if (flags & BKZ_DUMP_ENUM_TREE_STATS)
++    {
++      if (i > 0)
++      {
++        // enumeration_tree_stats += std::string(",\n");
++        // std::cout << "," << std::endl;
++        try
++        {
++          enumeration_tree_stats_dump << std::string(",\n");
++        }
++        catch (const ios_base::failure &e)
++        {
++          cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++          throw;
++        }
++      }
++      // enumeration_tree_stats += std::string("\"") + to_string(i) + std::string("\": \n");
++      // std::cout << "\"" << i << "\": " << std::endl;
++    }
++    if (flags & BKZ_SUBTREE_STATS_FILENAME)
++    {
++      if (i > 0)
++      {
++        // enumeration_tree_stats += std::string(",\n");
++        // std::cout << "," << std::endl;
++        try
++        {
++          enumeration_subtree_stats_dump << std::string(",\n");
++        }
++        catch (const ios_base::failure &e)
++        {
++          cerr << "Cannot open " << param.subtree_stats_filename << endl;
++          throw;
++        }
++      }
++      // enumeration_tree_stats += std::string("\"") + to_string(i) + std::string("\": \n");
++      // std::cout << "\"" << i << "\": " << std::endl;
++    }
++
+     try
+     {
+       if (sd)
+@@ -620,6 +899,42 @@ template <class ZT, class FT> bool BKZReduction<ZT, FT>::bkz()
+     if (clean || param.block_size >= num_rows)
+       break;
+   }
++  if (flags & BKZ_DUMP_ENUM_TREES)
++  {
++    enumeration_trees += std::string("]\n");
++    // enumeration_trees += std::string("}\n");
++    // std::cout << "}" << std::endl;
++  }
++  if (flags & BKZ_DUMP_ENUM_TREE_STATS)
++  {
++    // enumeration_tree_stats += std::string("]\n");
++    // enumeration_tree_stats += std::string("}\n");
++    // std::cout << "}" << std::endl;
++    try
++    {
++      enumeration_tree_stats_dump << std::string("]\n");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.dump_enum_tree_stats << endl;
++      throw;
++    }
++  }
++  if (flags & BKZ_SUBTREE_STATS_FILENAME)
++  {
++    // enumeration_tree_stats += std::string("]\n");
++    // enumeration_tree_stats += std::string("}\n");
++    // std::cout << "}" << std::endl;
++    try
++    {
++      enumeration_subtree_stats_dump << std::string("]\n");
++    }
++    catch (const ios_base::failure &e)
++    {
++      cerr << "Cannot open " << param.subtree_stats_filename << endl;
++      throw;
++    }
++  }
+ 
+   // some post processing
+   int dummy_kappa_max = num_rows;
+@@ -668,6 +983,18 @@ template <class ZT, class FT> bool BKZReduction<ZT, FT>::bkz()
+   {
+     dump_gso(param.dump_gso_filename, true, "Output", -1, (cputime() - cputime_start) * 0.001);
+   }
++  if (flags & BKZ_DUMP_ENUM_TREES)
++  {
++    dump_string(param.dump_enum_trees, enumeration_trees, false);
++  }
++  // if (flags & BKZ_DUMP_ENUM_TREE_STATS)
++  // {
++  //   dump_string(param.dump_enum_tree_stats, enumeration_tree_stats, false);
++  // }
++  if (flags & BKZ_DUMP_ENUM_TREE_STATS)
++    enumeration_tree_stats_dump.close();
++  if (flags & BKZ_SUBTREE_STATS_FILENAME)
++    enumeration_subtree_stats_dump.close();
+   return set_status(final_status);
+ }
+ 
+@@ -797,6 +1124,43 @@ void BKZReduction<ZT, FT>::dump_gso(const std::string &filename, bool append,
+   dump.close();
+ }
+ 
++template <class ZT, class FT>
++void BKZReduction<ZT, FT>::dump_string(const std::string &filename, const std::string &content, bool append)
++{
++  ofstream dump;
++  // Enable exceptions
++  dump.exceptions(ios_base::failbit | ios_base::badbit);
++
++  try
++  {
++    if (append)
++    {
++      dump.open(filename.c_str(), std::ios_base::app);
++    }
++    else
++    {
++      dump.open(filename.c_str());
++    }
++  }
++  catch (const ios_base::failure &e)
++  {
++    cerr << "Cannot open " << filename << endl;
++    throw;
++  }
++
++  try
++  {
++    dump << content;
++  }
++  catch (const ios_base::failure &e)
++  {
++    cerr << "Cannot open " << filename << endl;
++    throw;
++  }
++
++  dump.close();
++}
++
+ template <class ZT, class FT> bool BKZAutoAbort<ZT, FT>::test_abort(double scale, int maxNoDec)
+ {
+   double new_slope = -m.get_current_slope(start_row, num_rows);

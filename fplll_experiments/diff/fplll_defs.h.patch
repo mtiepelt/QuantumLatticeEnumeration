@@ -1,0 +1,24 @@
+diff --git a/fplll/defs.h b/fplll/defs.h
+index bfc4158d..6e474454 100644
+--- a/fplll/defs.h
++++ b/fplll/defs.h
+@@ -271,7 +271,18 @@ enum BKZFlags
+   BKZ_DUMP_GSO    = 0x40,
+   BKZ_GH_BND      = 0x80,
+   BKZ_SD_VARIANT  = 0x100,
+-  BKZ_SLD_RED     = 0x200
++  BKZ_SLD_RED     = 0x200,
++  BKZ_DUMP_ENUM_TREES = 0x400,
++  BKZ_DUMP_ENUM_TREE_STATS = 0x800,
++  BKZ_SUBTREE_ROOT_LEVEL = 0x1000,
++  BKZ_SUBTREE_STATS_FILENAME = 0x2000
++};
++
++enum StatsFlags
++{
++  STATS_DUMP_ENUM_TREES = 0x01,
++  STATS_DUMP_ENUM_TREE_STATS = 0x02,
++  STATS_DUMP_SUBTREE_STATS = 0x04,
+ };
+ 
+ enum HKZFlags

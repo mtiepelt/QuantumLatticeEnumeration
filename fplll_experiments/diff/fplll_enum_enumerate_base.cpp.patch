@@ -1,0 +1,410 @@
+diff --git a/fplll/enum/enumerate_base.cpp b/fplll/enum/enumerate_base.cpp
+index 1fa69da4..f78a8470 100644
+--- a/fplll/enum/enumerate_base.cpp
++++ b/fplll/enum/enumerate_base.cpp
+@@ -17,9 +17,14 @@
+    along with fplll. If not, see <http://www.gnu.org/licenses/>. */
+ 
+ #include "enumerate_base.h"
++#include <iostream>
++
++// #define my_verbose
+ 
+ FPLLL_BEGIN_NAMESPACE
+ 
++#undef FPLLL_WITH_RECURSIVE_ENUM
++
+ #ifdef FPLLL_WITH_RECURSIVE_ENUM
+ template <int kk, int kk_start, bool dualenum, bool findsubsols, bool enable_reset>
+ inline void EnumerationBase::enumerate_recursive(
+@@ -149,10 +154,71 @@ inline void EnumerationBase::enumerate_recursive_dispatch(int kk)
+ 
+ #endif
+ 
++std::string n_ary_to_str(TPNode *root, std::string lbl){
++  std::string ret = "";
++  if (!root) {
++    return ret;
++  }
++  ret = ret + std::string("{ \"n\": \"") + lbl + std::string("\", \"v\": ") + to_string(root->val) + std::string(", \"c\": [");
++  int cidx = 0;
++  int n_children = root->children.size();
++  for (TPNode* child : root->children) {
++    ret += n_ary_to_str(child, lbl + "-" + to_string(cidx++));
++    if (cidx < n_children) {
++      ret += std::string(",");
++    }
++    ret += std::string(" ");
++  }
++  ret += "]}";
++  return ret;
++}
++
++std::string n_ary_to_str_only_vals_as_list(TPNode *root, std::string lbl){
++  std::string ret = "";
++  if (!root) {
++    return ret;
++  }
++  ret = ret + std::string("\"") + lbl + std::string("\": ") + to_string(root->val) + std::string(", ");
++  int cidx = 0;
++  for (TPNode* child : root->children) {
++    ret += n_ary_to_str_only_vals_as_list(child, lbl + "-" + to_string(cidx++));
++  }
++  return ret;
++}
++
++long double absl(long double x) {
++  if (x < 0) {
++    return -x;
++  }
++  return x;
++}
++
+ template <bool dualenum, bool findsubsols, bool enable_reset> void EnumerationBase::enumerate_loop()
+ {
+-  if (k >= k_end)
++  // std::cout << std::endl << "-----------------------------------------------------" << std::endl;
++  // std::cout << "enumerate_loop, root level " << k_end - 1 - _subtree_root_level << std::endl;
++  
++  // std::cout << "d: " << d << ", k_end: " << k_end << std::endl;
++  // std::cout << "avg_children: ("; for (int my_i = 0; my_i < d; my_i++) {
++  //   avg_children[my_i] = 0.;
++  //   std::cout << avg_children[my_i] << ", ";
++  // }
++  // std::cout << ")" << std::endl;
++  // std::cout << "var_children: ("; for (int my_i = 0; my_i < d; my_i++) {
++  //   var_children[my_i] = 0.;
++  //   std::cout << var_children[my_i] << ", ";
++  // }
++  // std::cout << ")" << std::endl;
++  #ifdef my_verbose
++  std::cout << "> EnumeratioBase::enumerate_loop" << std::endl;
++  #endif
++  if (k >= k_end) {
++    std::cout << "k >= k_end" << std::endl;
++    #ifdef my_verbose
++    std::cout << "< EnumeratioBase::enumerate_loop" << std::endl;
++    #endif
+     return;
++  }
+ 
+   center_partsum_begin[0] = 0;
+   for (int i = 0; i < k_end; ++i)
+@@ -183,8 +249,10 @@ template <bool dualenum, bool findsubsols, bool enable_reset> void EnumerationBa
+   }
+ 
+   k = k_end - 1;
+-
++  int _k_old = k + 1;
++  subtrees_visited_so_far = 0;
+ #ifdef FPLLL_WITH_RECURSIVE_ENUM
++  std::cout << "FPLLL_WITH_RECURSIVE_ENUM" << std::endl;
+   enumerate_recursive_dispatch<dualenum, findsubsols, enable_reset>(k);
+   return;
+ #endif
+@@ -192,34 +260,131 @@ template <bool dualenum, bool findsubsols, bool enable_reset> void EnumerationBa
+   finished = false;
+   while (!finished)
+   {
++    bool going_down = _k_old > k;
++    bool going_up = _k_old < k;
++    // std::cout << "k " << k << ", k_old " << _k_old << ", going_down " << going_down << ", going_up " << going_up << " print " << bool(k == k_end - 1 - _subtree_root_level + 1 && going_up)  << std::endl; //" nodes " << nodes[k] << std::endl;
++    _k_old = k;
++
++    if (_subtree_root_level >= 0 && k >= 0) 
++      {
++      // if at level k+1 and going down from k, reset the tree counter
++      if (k == k_end - 1 - _subtree_root_level + 1 && going_up) {
++        // printing subtree descendents
++        // std::cout << "nodes_subtree: ";
++        // for (int i = k_end-1; i >= 0; --i) { std::cout << nodes_cur_subtree[i] << ", "; }
++        // std::cout << std::endl;
++
++        // contributing to stats
++        subtrees_visited_so_far++;
++        for (int i = 0; i < k_end; i++) {
++          nodes_subtree_avg[i] = (nodes_subtree_avg[i] * (subtrees_visited_so_far-1) + nodes_cur_subtree[k_end-i-1])/subtrees_visited_so_far;
++          nodes_subtree_second_moment[i] = (nodes_subtree_second_moment[i] * (subtrees_visited_so_far-1) + pow(nodes_cur_subtree[k_end-i-1], 2))/subtrees_visited_so_far;
++        }
++        double size_subtree = std::accumulate(nodes_cur_subtree.begin(), nodes_cur_subtree.end(), 0);
++        size_subtree_avg = (size_subtree_avg * (subtrees_visited_so_far-1) + size_subtree ) / subtrees_visited_so_far;
++        sqrt_size_subtree_avg = (sqrt_size_subtree_avg * (subtrees_visited_so_far-1) + std::sqrt(size_subtree) ) / subtrees_visited_so_far;
++        sqr_size_subtree_avg = (sqr_size_subtree_avg * (subtrees_visited_so_far-1) + pow(size_subtree, 2.) ) / subtrees_visited_so_far;
++        subtree_samp_var = (sqr_size_subtree_avg - pow(size_subtree_avg, 2.)) * subtrees_visited_so_far / (subtrees_visited_so_far - 1.); // unbiased sample variance
++
++        //resetting tree
++        // std::cout << "resetting tree" << std::endl;
++        std::fill(nodes_cur_subtree.begin(), nodes_cur_subtree.end(), 0);
++      } 
++    }
++
++    // std::cout << std::endl << "-----------" << std::endl; //" nodes " << nodes[k] << std::endl;
++    // std::cout << "x = ("; for (int my_i = 0; my_i < d; my_i++) { if (my_i < k) { std::cout << "_, "; } else { std::cout << x[my_i] << ", "; } }std::cout << ")" << std::endl;
++    // std::cout << "     "; for (int my_i = 0; my_i < d; my_i++) { if (my_i == k) std::cout << "^"; else std::cout << " "; std::cout << "  "; } std::cout << " " << std::endl;
+     enumf alphak  = x[k] - center[k];
+     enumf newdist = partdist[k] + alphak * alphak * rdiag[k];
+     FPLLL_TRACE("Level k=" << k << " dist_k=" << partdist[k] << " x_k=" << x[k]
+                            << " newdist=" << newdist << " partdistbounds_k=" << partdistbounds[k]);
+     if (newdist <= partdistbounds[k])
+     {
++      if (stats_flags & STATS_DUMP_ENUM_TREES) {
++        #ifdef my_verbose
++        std::cout << "about to increase val at level " << k; std::fflush(stdout);
++        std::cout << " (recorded: " << cur_node->lvl << ") from "; std::fflush(stdout);
++        std::cout << cur_node->val << std::endl;
++        #endif
++        cur_node->val++;
++      }
+       ++nodes[k];
++
++      if (_subtree_root_level >= 0 && k >= 0 && k < k_end - 1 - _subtree_root_level && going_down) {
++        // std::cout << "adding node at " << k << std::endl;
++        ++nodes_cur_subtree[k];
++      }
++
++      // std::cout << "nodes[" << k << "] = " << nodes[k] << std::endl;
++      // int __i = k;
++      double RHS_sqr = (partdistbounds[k] - partdist[k]) / rdiag[k];
++      double RHS = sqrtf64(RHS_sqr);
++      // double RHS = pow(partdistbounds[__i], 2.);
++      // for (int __k = __i + 1; __k < d; __k++) {
++      //   double sum_xr_mu_rk = 0.;
++      //   for (int __r = __k + 1; __r < d; __r++) {
++      //     sum_xr_mu_rk += x[__r] * mut[__k][__r];
++      //   }
++      //   RHS = RHS - pow(absl((double)x[__k] + sum_xr_mu_rk), 2) * rdiag[__k];
++      // }
++      // RHS = sqrtl(RHS / rdiag[__i]);
++
++      // assert(fabs(
++      //   (nodes[k] == 0 ? round(2 * RHS) : (avg_children[k] * nodes[k] + round(2 * RHS)) / (nodes[k] + 1))
++      //   - ((avg_children[k] * nodes[k] + round(2 * RHS)) / (nodes[k] + 1))
++      // ) < 0.01);
++      // assert(fabs(
++      //   (nodes[k] == 0 ? pow(round(2 * RHS), 2) : (var_children[k] * nodes[k] + pow(round(2 * RHS), 2)) / (nodes[k] + 1))
++      //   - ((var_children[k] * nodes[k] + pow(round(2 * RHS), 2)) / (nodes[k] + 1))
++      // ) < 0.01);
++                                                                          // on root node we ignore half the solutions to halve the enum tree
++      avg_children[k] = (avg_children[k] * nodes[k] + round(2 * RHS) - (int)(k == d - 1)*((int)round(2 * RHS)/2) ) / (nodes[k] + 1);
++      // for now this is not the variance, it's the second moment!
++      var_children[k] = (var_children[k] * nodes[k] + pow(round(2 * RHS)- (int)(k == d - 1)*((int)round(2 * RHS)/2), 2)) / (nodes[k] + 1);
++      // std::cout << "avg_children[" << k << "] = " << avg_children[k] << std::endl;
+       alpha[k] = alphak;
+       if (findsubsols && newdist < subsoldists[k] && newdist != 0.0)
+       {
+         subsoldists[k] = newdist;
+         process_subsolution(k, newdist);
+       }
++
+       --k;
++
+       if (k < 0)
+       {
+         if (newdist > 0.0 || !is_svp)
+           process_solution(newdist);
++        #ifdef my_verbose
++        std::cout << "next_pos_up due to k < 0" << std::endl;
++        #endif
+         finished = !next_pos_up();
+         continue;
+       }
+-      if (enable_reset &&
+-          k < reset_depth)  // in CVP, below the max GS vector, we reset the partial distance
++      // more nodes to go into
++      #ifdef my_verbose
++      std::cout << "more nodes to go into" << std::endl;
++      #endif
++      if (stats_flags & STATS_DUMP_ENUM_TREES) {
++        cur_node = cur_node->push_child(0, k);
++      }
++
++      // if (stats_flags & STATS_DUMP_ENUM_TREES) {
++      //   TPNode *new_node = new TPNode(0, cur_node);
++      //   std::cout << "push_back" << std::endl;
++      //   cur_node->children.push_back(new_node);
++      //   cur_node = new_node;
++      // }
++
++      // assert(!enable_reset);
++      if (enable_reset && k < reset_depth)  // in CVP, below the max GS vector, we reset the partial distance
+       {
+         reset(newdist, k);
+         finished = !next_pos_up();
+         continue;
+       }
++      // assert(!dualenum);
+       if (dualenum)
+       {
+         for (int j = center_partsum_begin[k + 1]; j > k; --j)
+@@ -236,14 +401,170 @@ template <bool dualenum, bool findsubsols, bool enable_reset> void EnumerationBa
+       enumf newcenter = center_partsums[k][k + 1];
+       center[k]       = newcenter;
+       partdist[k]     = newdist;
+-      roundto(x[k], newcenter);
++      roundto(x[k], newcenter); // enumerate from around -center
+       dx[k] = ddx[k] = (((int)(newcenter >= x[k]) & 1) << 1) - 1;
+     }
+     else
+     {
++
++      if (_subtree_root_level >= 0 && k >= 0 && k < k_end - 1 - _subtree_root_level && going_down) {
++        // std::cout << "would add node at " << k << " but we fell out of the radius" << std::endl;
++      }
++      #ifdef my_verbose
++      std::cout << "next_pos_up due to no solution" << std::endl;
++      #endif
++      if (stats_flags & STATS_DUMP_ENUM_TREES) {
++        // assert(cur_node->parent != (fplll::TPNode*)0xdeadbeef);
++        cur_node = cur_node->parent;
++      }
+       finished = !next_pos_up();
+     }
+   }
++  // fix variance:
++  for (int __i = 0; __i < d; __i++) {
++    var_children[__i] = var_children[__i] - pow(avg_children[__i], 2);
++    // unbiase the sample variance
++    var_children[__i] *= (double)d / (d-1);
++  }
++
++  // check if avg_children got it kinda right
++  /*
++  for (int __i = d - 1; __i >= 0; __i--) {
++    int lvl = __i;
++    int tot_nodes = (lvl == d-1) ? 1 : (nodes[lvl+1]+1);
++    int tot_children = nodes[lvl]+1;
++    double measured_avg_ch = (double)tot_children / tot_nodes;
++    double avg_ch = avg_children[lvl];
++    double stdev_ch = sqrtf64(var_children[lvl]);
++    std::cout << "lvl: " << lvl << std::endl;
++    std::cout << "nodes at lvl: " << tot_nodes << ", children on next lvl: " << tot_children << std::endl;
++    std::cout << "measured_avg: " << measured_avg_ch << std::endl;
++    std::cout << "  theory_avg: " << avg_ch << std::endl;
++    std::cout << "theory_stdev: " << stdev_ch << std::endl;
++    std::cout << std::endl;
++  }
++  */
++
++  // #ifdef my_verbose
++  // std::cerr << "tree = " << n_ary_to_str(root, to_string(0)) << std::endl;
++  // std::cerr << "vals = {" << n_ary_to_str_only_vals_as_list(root, to_string(0)) << "}" << std::endl;
++  // std::cerr << "tree = " << get_tree<dualenum, findsubsols, enable_reset>() << std::endl;
++  // std::cerr << "vals = " << get_tree_degrees<dualenum, findsubsols, enable_reset>() << std::endl;
++  if (!dualenum && !enable_reset) {
++    // std::cerr << "tree = " << get_tree() << std::endl;
++    // std::cerr << "vals = " << get_tree_degrees() << std::endl;
++    // std::cerr << "stats = " << get_tree_stats() << std::endl;
++  }
++  // std::cout << "< EnumerateBase::enumerate_loop" << std::endl;
++  // #endif
++
++
++  // // check if avg_children got it kinda right
++  // for (int __i = 0; __i < d; __i++) {
++  //   std::cout << "nodes[" << __i << "] = " << nodes[__i] << std::endl;
++  //   std::cout << "avg_children[" << __i << "] = " << avg_children[__i] << std::endl;
++  //   std::cout << std::endl;
++  // }
++  // std::cout << get_subtree_stats();
++}
++
++// template <bool dualenum, bool findsubsols, bool enable_reset> std::string EnumerationBase::get_tree()
++std::string EnumerationBase::get_tree()
++{
++  // assert(!enable_reset);
++  // assert(!dualenum);
++  return n_ary_to_str(root, to_string(0));
++}
++
++// template <bool dualenum, bool findsubsols, bool enable_reset> std::string EnumerationBase::get_tree()
++std::string EnumerationBase::get_tree_stats(const vector<enumf> &pruning, std::basic_string<char> gso_string)
++{
++  // assert(!enable_reset);
++  // assert(!dualenum);
++  std::string stats = "{\n";
++  stats += std::string("\"pruning\": [");
++  for (std::vector<double>::size_type __i = 0; __i < pruning.size(); __i++) {
++    stats += to_string(pruning[__i]);
++    if (__i < pruning.size() - 1) {
++      stats += std::string(", ");
++    }
++  }
++  stats += std::string("],\n");
++  stats += gso_string;
++
++  int cnt = 0;
++  for (int __i = d - 1; __i >= 0; __i--) {
++    int lvl = __i;
++    int tot_nodes = (lvl == d-1) ? 1 : (nodes[lvl+1]+1);
++    int tot_children = nodes[lvl]+1;
++    double measured_avg_ch = (double)tot_children / tot_nodes;
++    double avg_ch = std::isnan(avg_children[lvl]) ? -1 : avg_children[lvl];
++    double var_ch = std::isnan(var_children[lvl]) ? -1 : var_children[lvl];
++    stats +=  std::string("\"") + to_string(cnt) + std::string("\":");
++    stats +=  std::string("{ ") 
++              + std::string("\"n\":") + to_string(tot_nodes) + std::string(", ")
++              + std::string("\"mac\":") + to_string(measured_avg_ch) + std::string(", ")
++              + std::string("\"tac\":") + to_string(avg_ch) + std::string(", ")
++              + std::string("\"tvc\":") + to_string(var_ch)
++            + std::string(" }");
++    if (__i > 0) {
++      stats += std::string(",");
++    }
++    stats += std::string("\n");
++    cnt++;
++  }
++
++
++  // for (int __i = 0; __i < d; __i++) {
++  //   stats += std::string("\"") + to_string(__i) + std::string("\":");
++  //   stats += std::string("(") + to_string(avg_children[__i]) + std::string(", ") + to_string(var_children[__i]) + std::string("),\n");
++  // }
++  stats += std::string("}\n");
++  return stats;
++}
++
++std::string EnumerationBase::get_subtree_stats()
++{
++  std::string stats = "{\n";
++  stats += std::string("\"avg\": [");
++  for (int i = 0; i < k_end; i++) {
++    int lvl = i;
++    double avg_descendents = std::isnan(nodes_subtree_avg[lvl]) ? -1 : nodes_subtree_avg[lvl];
++    stats += to_string(avg_descendents);
++    if (i < k_end - 1) {
++      stats += std::string(", ");
++    }
++  }
++  stats += std::string("],\n");
++  stats += std::string("\"var\": [");
++  for (int i = 0; i < k_end; i++) {
++    int lvl = i;
++    double avg_descendents = std::isnan(nodes_subtree_avg[lvl]) ? -1 : nodes_subtree_avg[lvl];
++    double second_moment_descendents = std::isnan(nodes_subtree_second_moment[lvl]) ? -1 : nodes_subtree_second_moment[lvl];
++    double var_descendents = -1;
++    if (avg_descendents >= 0 && second_moment_descendents >= 0) {
++      var_descendents = second_moment_descendents - pow(avg_descendents, 2);
++    }
++    stats += to_string(var_descendents);
++    if (i < k_end - 1) {
++      stats += std::string(", ");
++    }
++  }
++  stats += std::string("],\n");
++  stats += std::string("\"avg_tot\": ")      + to_string(std::isnan(size_subtree_avg) ? -1 : size_subtree_avg) + std::string(",\n");
++  stats += std::string("\"avg_sqrt_tot\": ") + to_string(std::isnan(sqrt_size_subtree_avg) ? -1 : sqrt_size_subtree_avg) + std::string(",\n");
++  stats += std::string("\"avg_sqr_tot\": ") + to_string(std::isnan(sqr_size_subtree_avg) ? -1 : sqr_size_subtree_avg) + std::string(",\n");
++  stats += std::string("\"unb_samp_var_tot\": ") + to_string(std::isnan(subtree_samp_var) ? 0 : subtree_samp_var) + std::string("\n"); // get nan when unbiasing with "n/(n-1)" factor at n = 1. => only one value, variance 0 (simplifies the plotting script)
++  stats += std::string("}\n");
++  return stats;
++}
++
++// template <bool dualenum, bool findsubsols, bool enable_reset> std::string EnumerationBase::get_tree_degrees()
++std::string EnumerationBase::get_tree_degrees()
++{
++  // assert(!enable_reset);
++  // assert(!dualenum);
++  return std::string(1, '{') + n_ary_to_str_only_vals_as_list(root, to_string(0)) + std::string(1, '}');
+ }
+ 
+ template void EnumerationBase::enumerate_loop<false, false, true>();

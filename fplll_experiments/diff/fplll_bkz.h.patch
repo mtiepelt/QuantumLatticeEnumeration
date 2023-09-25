@@ -1,0 +1,45 @@
+diff --git a/fplll/bkz.h b/fplll/bkz.h
+index d5c8d6a2..dcb31e83 100644
+--- a/fplll/bkz.h
++++ b/fplll/bkz.h
+@@ -22,6 +22,7 @@
+ #include "enum/enumerate.h"
+ #include "enum/evaluator.h"
+ #include "lll.h"
++#include <fstream>
+ 
+ FPLLL_BEGIN_NAMESPACE
+ 
+@@ -287,6 +288,21 @@ public:
+   void dump_gso(const std::string &filename, bool append, const std::string &step, const int loop,
+                 const double time);
+ 
++  /**
++   * @brief Dumps a string to file.
++   *
++   * Writes given string into the specified file.
++   *
++   * @param filename
++   *    name of the file
++   * @param content
++   *    content of the file
++   * @param append
++   *    flag specifying if the shape should be appended to the file (or if the file
++   *    should be overwritten)
++   * **/
++  void dump_string(const std::string &filename, const std::string &content, bool append);
++
+   /**
+    * Status of reduction (see defs.h)
+    */
+@@ -335,6 +351,10 @@ private:
+   const vector<FT> empty_target, empty_sub_tree;
+   FT max_dist, delta_max_dist;
+   double cputime_start;
++  std::string enumeration_trees;
++  // std::string enumeration_tree_stats; // used to construct the tree in memory
++  std::ofstream enumeration_tree_stats_dump; // ... but now we write it to disk right away
++  std::ofstream enumeration_subtree_stats_dump;
+ };
+ 
+ /**
