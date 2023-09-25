@@ -17,7 +17,7 @@ import Tools
 import numpy as np
 from collections import defaultdict
 
-def draw_intersecting_lines(ax, n, log_M, max_depth, leg_font_size = 11):
+def draw_intersecting_lines(ax, n, log_M, max_depth, circ_desc='Query', leg_font_size = 11):
 	"""
 	Intersection of plots with
 		1. Expected cost of classical enumeration
@@ -45,20 +45,24 @@ def draw_intersecting_lines(ax, n, log_M, max_depth, leg_font_size = 11):
 	if n == 623 and max_depth != 96 and max_depth != 0:
 		z_coord_line_leg = 1
 
-	# QUASI SQRT
+	if circ_desc == 'Minimal' and (n == 623 or n == 873):
+		z_coord_line_leg = 1
+
+	# QUASI SQRT ----------------------------------------
 	#ax.axhline(y=quasi_sqrt, dashes=[4, 8], color='black', alpha=1, lw=1, label='Quasi-Sqrt(classical cost)'
 	ax.axhline(y=quasi_sqrt, dashes=[4, 8], color='black', alpha=1, lw=1) # label='Quasi-Sqrt(classical cost)'
 
 	line_leg_vert_align = 'bottom'
 	if n == 623 and max_depth == 40:
 		line_leg_vert_align = 'top'
-	if n == 623 and max_depth == 96:
+	if circ_desc=='Query' and n == 623 and max_depth == 96:
 		z_coord_line_leg = 40
 	if n == 406 and max_depth == 64:
 		line_leg_vert_align = 'top'
 
-	# EXPECTED GROVER COST
 	text(z_coord_line_leg, quasi_sqrt, "Quasi-Sqrt(classical cost)", horizontalalignment='left', verticalalignment=line_leg_vert_align, fontsize=leg_font_size)
+
+	# EXPECTED GROVER COST ----------------------------------------
 	#ax.axhline(y=Tools.aes_expected_security[n][max_depth], dashes=[3, 3], color='#B90E0A', alpha=1, lw=1, label='Expected cExpected cost of Grover on AES')
 	ax.axhline(y=Tools.aes_expected_security[n][max_depth], dashes=[3, 3], color='#B90E0A', alpha=1, lw=1) #, label='Expected cost of Grover on AES'
 
@@ -70,20 +74,20 @@ def draw_intersecting_lines(ax, n, log_M, max_depth, leg_font_size = 11):
 
 	text(z_coord_line_leg, Tools.aes_expected_security[n][max_depth], "Expected cost of Grover on AES", horizontalalignment='left', verticalalignment=line_leg_vert_align, fontsize=leg_font_size, color='#B90E0A')
 
-	# TARGET SECURITY
+	# TARGET SECURITY ----------------------------------------
 	# ax.axhline(y=Tools.kyber_expected_security[n], dashes=[1, 1], color='#B90E0A', alpha=1, lw=1, label='Target security of Kyber')
 	ax.axhline(y=Tools.kyber_expected_security[n], dashes=[1, 1], color='#B90E0A', alpha=1, lw=1) #, label='Target security of Kyber')
 	line_leg_vert_align = 'bottom'
-	if n == 623 and max_depth == 96:
+	if circ_desc=='Query' and n == 623 and max_depth == 96:
 		z_coord_line_leg = 43
 
 	if n == 873 and (max_depth == 64 or max_depth == 96 or max_depth == 0):
 		line_leg_vert_align = 'top'
-	if n == 873:
+	if circ_desc=='Query' and n == 873:
 		z_coord_line_leg = 35
 	text(z_coord_line_leg, Tools.kyber_expected_security[n], "Target security of Kyber", horizontalalignment='left', verticalalignment=line_leg_vert_align, color='#B90E0A', fontsize=leg_font_size)
 
-	# EXPECTED CLASSICAL
+	# EXPECTED CLASSICAL ----------------------------------------
 	#ax.axhline(y=log_cost_classical, dashes=[2, 6], color='black', alpha=1, lw=1, label='Expected cost of classical enumeration')
 	ax.axhline(y=log_cost_classical, dashes=[2, 6], color='black', alpha=1, lw=1)#, label='Expected cost of classical enumeration')
 	text(25, log_cost_classical-1, "Expected cost of classical enumeration", horizontalalignment='left', verticalalignment='top', fontsize=leg_font_size)
@@ -233,7 +237,7 @@ def plot_cost_estimation_z_to_g_cost(plot_dir, filename, z_to_cost, max_depth, n
 	setup_plot(ax, x_coords, y_coords_quantum, max_depth, n, log_M)
 
 	# Draw aes-grover, target, quasi-quadratic lines
-	draw_intersecting_lines(ax, n, log_M, max_depth)
+	draw_intersecting_lines(ax, n, log_M, max_depth, circ_desc=circuit.desc)
 
 	# Draw Costs
 	if max_depth > 0:
