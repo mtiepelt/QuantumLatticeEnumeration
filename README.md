@@ -20,6 +20,21 @@ python3 build_alfk.py
 
 # Generating cost estimation
 
+
+## Section 3
+
+Naive depth of QPE(W) using the LWE Estimator (page 12).
+
+```
+cd /path/to/code/LWEEstimator 
+
+sage our_kyber_estimates.py
+```
+
+
+
+## Section 5
+
 ```
 cd /path/to/code/Cost_Estimation
 
