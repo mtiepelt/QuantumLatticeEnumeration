@@ -18,6 +18,7 @@ cd /path/to/code/LatticeHeuristics/alfk
 python3 build_alfk.py
 ```
 
+
 # Generating cost estimation
 
 
@@ -49,14 +50,13 @@ cd /path/to/code/Cost_Estimation
 python3 main_interface.py --help
 ```
 
-
 ## Results
 
 From the paper:
 
 * ...  `/path/to/code/costResults/Query` contains estimations with instantiation of quantum opererator W as in Section 4.1
 * ... `/path/to/code/costResults/Minimal` contains estimations with instantiation of quantum opererator W as in Section 4.2
-* The graphs of Figure 4 in Section 5 and Figure 12,13,14,15 of th appendix can be found in the folder with the corresponding blocksize:
+* The graphs of Figure 4 in Section 5 and Figure 12,13,14,15 of the appendix can be found in the folder with the corresponding blocksize:
     * for Kyber512 in folder `406`
     * for Kyber768 in folder `623`
     * for Kyber1024 in folder `873`
@@ -68,6 +68,16 @@ Specific Files:
 * `*.pdf` are the corresponding plots 
 * `*.costs` contain the detailed costs of each point plotted in the corresponding `*.pdf` 
 
+
+## Appendix F
+
+For how to compute the runtime of QPE(W), see `/QPE/README.md`.
+
+## Experiments on the size of enumeration trees
+
+### Appendices B, C, G
+
+For computing the experiments on the number of children and descendants in enumeration trees, as well as experiments on the Jensen gap, see `/fplll_experiments/README.md`.
 
 # Code Overview 
 
