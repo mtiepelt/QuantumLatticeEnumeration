@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from sage.all import RealField, log2
-RRR = RealField(200)
+__author__ = "Marcel Tiepelt"
+__version__ = "1.0"
+__status__ = "Research"
 
+from sage.all import RealField
+RRR = RealField(200)
 
 from functools import lru_cache
 
-import TreeHeuristics as TH
 import math
 import numpy as np
 import Circuits
@@ -19,53 +21,9 @@ import json
 from dataclasses import dataclass, asdict
 from collections import defaultdict
 
-"""
-    Expected Security of AES under MAXDEPTH restrictions following
-    Jaques, S., Naehrig, M., Roetteler, M., Virdia, F.: Implementing grover oracles for quantum key search on AES and LowMC. pp. 280–310 (2020). https://doi.org/10.1007/978-3-030-45724-2_10
-    Table 10, 12 
-"""
-aes_expected_security = {
-        381:
-            {
-                0: 83,
-                40: 117,
-                64: 93,
-                96: 83
-            },
-        406:
-            {
-                0: 83,
-                40: 117,
-                64: 93,
-                96: 83
-            },
-        623:
-            {
-                0: 115,
-                40: 181,
-                64: 157,
-                96: 126
-            },
-        873:
-            {
-                0: 148,
-                40: 245,
-                64: 221,
-                96: 190
-            },
-    }
+# Load expected security values from configuration file
+from configSecurity import aes_expected_security, kyber_expected_security
 
-"""
-    Expected Security of Kyber based on NIST levels according to
-    NIST: Submission requirements and evaluation criteria for the post-quantum cryptography standardization process (2016), 
-    https://csrc.nist.gov/CSRC/media/Projects/Post-Quantum-Cryptography/documents/call-for-proposals-final-dec-2016.pdf
-"""
-kyber_expected_security = {
-        381: 128,
-        406: 128,
-        623: 192,
-        873: 256
-    }
 
 def get_intersection_x(x_coords, y_total, y_critical):
     """
@@ -73,7 +31,7 @@ def get_intersection_x(x_coords, y_total, y_critical):
     :param x_coords: X coordinates
     :param y_total: Y coordinates
     :param y_critical: Coordinates to check for intersection with with Y coordinates
-    :return:
+    :return: x_coords of intersection, {'>>', '<=', '<'}
     """
 
     # result: 1 <==> total <= critical
@@ -106,7 +64,7 @@ def get_intersection_x(x_coords, y_total, y_critical):
         return x_coords[-1], '>>'
 
 
-def get_intersections(n, max_depth, log_M, z_to_cost):
+def get_intersections(n, max_depth, log_M, z_to_cost, constants, bound):
     """
     Find intersection for
         1. Expected cost of classical enumeration
@@ -117,7 +75,7 @@ def get_intersections(n, max_depth, log_M, z_to_cost):
     :param max_depth: MaxDepth constraint for quantum circuit as used in cost estimation
     :param log_M: Log bound on number of combindes randomized enumeration bases
     :param z_to_cost: Dictionary [Jensen's z] --> cost
-    :return:
+    :return: Dictionary of all intersections
     """
     x_coords = sorted(list(z_to_cost.keys()))
     y_total_cost = [z_to_cost[z].log_gcost_total() for z in x_coords]
@@ -130,23 +88,18 @@ def get_intersections(n, max_depth, log_M, z_to_cost):
 
     # Intersection with Expected Cost for AES
     z_value, total_INEQ_crit = get_intersection_x(x_coords, y_total_cost, [aes_expected_security[n][max_depth]] * len(x_coords))
-    intersections['aes_grover'] = [z_value, total_INEQ_crit]
-    #print(f"  is z_value={z_value}, ineq is {inequality} \n")
+    intersections['aes_grover'] = [z_value, total_INEQ_crit, y_total_cost[x_coords.index(z_value)],]
 
     # Intersection with Expected Cost for Security Target
     z_value, total_INEQ_crit = get_intersection_x(x_coords, y_total_cost, [kyber_expected_security[n]] * len(x_coords))
-    intersections['target'] = [z_value, total_INEQ_crit]
-    #print(f"  is z_value={z_value}, ineq is {inequality} \n")
+    intersections['target'] = [z_value, total_INEQ_crit, y_total_cost[x_coords.index(z_value)], ]
 
     # Intersection with Quasi-Quadratic Quantum Speedup
-    treeH = TH.TreeHeuristics()
-    costF = CF.CostFunctions(treeH, n=n, bound_coefficient=-1, nbases=2 ** log_M, pprime=1,
-                             const_reps_QPE=-1, const_reps_W=-1, num_nodes_branching_dfs=-1, force_DF=-1)
+    costF =CF.CostFunctions(n=n, nbases=2**log_M, pprime=1, constants=constants, bound=bound)
     log_cost_classical = costF.log_enumeration_cost_classical()
 
     z_value, total_INEQ_crit = get_intersection_x(x_coords, y_total_cost, [(log_cost_classical + math.log(n, 2)) / 2] * len(x_coords))
-    intersections['quasi-quadratic'] = [z_value, total_INEQ_crit]
-
+    intersections['quasi-quadratic'] = [z_value, total_INEQ_crit, y_total_cost[x_coords.index(z_value)]]
     return intersections
 
 @dataclass
@@ -193,52 +146,49 @@ class Cost:
         self.log_t_depth = log_t_depth
         self.qracm = qracm
 
-    def __get_filename(self):
-        pass
-
-    def __get_dir(self):
-        pass
-
 
 class CostFiles:
     """
         Output exact costs for every Jensen's z to file.
     """
-    def __init__(self, bound_coef, modulus_q, const_reps_QPE, const_reps_W, num_nodes_branching_dfs, force_DF):
+    def __init__(self, q, constants, bound):
         """
-        Parameters as used in the cost estiamtion.
-        :param modulus_q: LWE modulus q
-        :param bound_coef:    Bound C on the node degree used for enumeration of the tree (cf. Section 3.1).
-        :param const_reps_QPE:  Constant 1/b for number of repetitions in QPE (cf. Corollary 1)
-        :param const_reps_W: Constant epsilon for number of repetition of QPE (cf. Section 3.1)
-        :param num_nodes_branching_dfs: Number of nodes checked for branching in classical binary search within FMV.
-        :param force_DF: Number of DMV calls in FMV (cf. Section 3.1)
+
+        :param q: LWE Modulus.
+        :param constants: Dict of constants 'boundCoefficient', 'num_nodes_branching_dfs', 'force_DF', 'const_reps_QPE', 'const_reps_W' determining bound on DetectMV and FindMV
+        :param bound: Bounds on estimation of subtree size, 'LBLB', 'UBLB', 'UBUB'
         """
-        self.bound_coef = bound_coef
-        self.modulus_q = modulus_q
-        self.const_reps_W = const_reps_W
-        self.const_reps_QPE = const_reps_QPE
-        self.num_nodes_branching_dfs = num_nodes_branching_dfs
-        self.force_DF = force_DF
+
+        self.bound_coef = constants['boundCoefficient']
+        self.modulus_q = q
+        self.const_reps_W = constants['const_reps_W']
+        self.const_reps_QPE = constants['const_reps_QPE']
+        self.num_nodes_branching_dfs = constants['num_nodes_branching_dfs']
+        self.force_DF = constants['force_DF']
+        self.bound = bound
 
     def get_parameter_str(self):
-        return f"C{self.bound_coef}_Q{self.modulus_q}_b{self.const_reps_W}_e{self.const_reps_QPE}_branch{self.num_nodes_branching_dfs}_DF{self.force_DF}"
+        """
+        Unique identifier for instance based on constant and modulus.
+        :return: unique string
+        """
+        return f"C{self.bound_coef}_Q{self.modulus_q}_b{self.const_reps_W}_e{self.const_reps_QPE}_branch{self.num_nodes_branching_dfs}_DF{self.force_DF}_b{self.bound}"
 
 class DataFiles(CostFiles):
     """
         Data cache for cost estimation
     """
-    def __init__(self, max_depth, n, bound_coef, modulus_q, const_reps_QPE, const_reps_W, num_nodes_branching_dfs, force_DF):
+    def __init__(self, n, q, max_depth, constants, bound):
         self.n = n
         self.max_depth = max_depth
-        super().__init__(bound_coef, modulus_q, const_reps_QPE, const_reps_W, num_nodes_branching_dfs, force_DF)
+        super().__init__(q, constants, bound)
 
     def __get_dir(self, circuit, cache_dir='costData'):
         """
         Get shared directory for all cache files.
         :param circuit: Circuit instantiation object as used in cost esteiamtion.
         :param cache_dir: Target directory.
-        :return:
+        :return: string
         """
         return cache_dir + '/' + str(self.n) + '/' + str(circuit.desc)
 
@@ -250,33 +200,31 @@ class DataFiles(CostFiles):
         :param step_size: Stepsize for M
         :param log_z: Log bound on Jensen's z
         :param circuit: Circuit instantiation.
-        :return:
+        :return: string
         """
         return f"{self.n}_{self.max_depth}_{circuit.desc}_M{log_M}_Y{log_Y}_ss{step_size}_Z{log_z}_{super(DataFiles, self).get_parameter_str()}.data"
 
     def write_data_cost_to_file(self, z_to_cost_new, circuit, log_M, log_Y, step_size):
         """
-        Write cost for all z values to file.
+        Write cost for all Jensen's gap z values to file.
         :param z_to_cost_new: Dictionary [Jensen z] --> cost
         :param circuit: Circuit instantiation.
         :param log_M: Log bound on number of combined bases
         :param log_Y: Log bound on number of combined nodes on level k
         :param step_size: Stepsize for M
-        :return:
         """
         for key, value in z_to_cost_new.items():
             self.write_data_cost_file(value, circuit, log_M, log_Y, step_size, key)
 
     def write_data_cost_file(self, m_k_to_cost, circuit, log_M, log_Y, step_size, log_z):
         """
-        Caches cost data for a specific Jensen z to a file.
+        Write cost data for one Jensen's gap z of a unique instance to a file.
         :param m_k_to_cost: Dictionary [#combined bases] --> [Level k] --> cost
         :param circuit: Circuit instantiation.
         :param log_M: Log bound on number of combined bases
         :param log_Y: Log bound on number of combined nodes on level k
         :param step_size: Stepsize for M
         :param log_z: Log Jensen's z
-        :return:
         """
         full_dir = self.__get_dir(circuit)
         filename = self.__get_filename(log_M, log_Y, step_size, log_z, circuit)
@@ -293,7 +241,6 @@ class DataFiles(CostFiles):
                 full_data = asdict(cost)
                 data = json.dumps(full_data)
                 file.write(data + '\n\n')
-        #print(f" (write_data) Wrote data to {full_dir}/{filename}")
 
     def read_cached_data_from_file(self, circuit, log_M, log_Y, step_size, log_Z, step_size_z):
         """
@@ -304,7 +251,7 @@ class DataFiles(CostFiles):
         :param step_size: Stepsize for M
         :param log_z: Log Jensen's z
         :param step_size_z: Stepsize for Jensen's z
-        :return:
+        :return: [z] --> [m] --> [k] --> Cost()
         """
         full_dir = self.__get_dir(circuit)
         z_m_k_cost = {}
@@ -323,8 +270,6 @@ class DataFiles(CostFiles):
                         if exists:
                             z_m_k_cost[log_z] = self.__read_data_cost_from_file(full_dir, filename, log_M, log_Y, step_size, read_step_size=ss, log_M_lower=0)
 
-        #print(f"read {z_m_cost}")
-
         return z_m_k_cost
 
     def __read_data_cost_from_file(self, full_dir, filename, log_M, log_Y, step_size, read_step_size=0, log_M_lower=0):
@@ -339,7 +284,7 @@ class DataFiles(CostFiles):
         :param log_z: Log Jensen's z
         :param read_step_size: Stepsize for m to read from file
         :param log_M_lower: Lower bound on number of combined bases
-        :return:
+        :return: [m] --> [k] --> Cost()
         """
         os.system('mkdir -p ' + full_dir)
         os.system('touch ' + full_dir + '/PLACEHOLDER')
@@ -365,26 +310,24 @@ class DataFiles(CostFiles):
                     cost.set_gcost(log_gcost_classical=cost_dict['log_gcost_classical'], log_gcost_quantum=cost_dict['log_gcost_quantum'])
                     cost.set_misc(qracm=cost_dict['qracm'], log_t_depth=cost_dict['log_t_depth'])
                     m_k_cost[cost_dict['log_m']][cost_dict['k']] = cost
-        # print(f" (read_cost_from_file) Read cached data from {full_dir}/{filename} for z {log_z}")
         return m_k_cost
 
 class ResultFiles(CostFiles):
     """
         Output result for cost estimation
     """
-    def __init__(self, bound_coef, modulus_q, const_reps_QPE, const_reps_W, num_nodes_branching_dfs, force_DF, results_dir='costResults'):
+    def __init__(self, q, constants, bound, results_dir='costResults'):
         """
-        Parameters as used in the cost estiamtion.
-        :param modulus_q: LWE modulus q
-        :param bound_coef:    Bound C on the node degree used for enumeration of the tree (cf. Section 3.1).
-        :param const_reps_QPE:  Constant 1/b for number of repetitions in QPE (cf. Corollary 1)
-        :param const_reps_W: Constant epsilon for number of repetition of QPE (cf. Section 3.1)
-        :param num_nodes_branching_dfs: Number of nodes checked for branching in classical binary search within FMV.
-        :param force_DF: Number of DMV calls in FMV (cf. Section 3.1)
-        :param results_dir: Target directory for output files
+        :param q: LWE modulus
+        :param constants: Dict of constants 'boundCoefficient', 'num_nodes_branching_dfs', 'force_DF', 'const_reps_QPE', 'const_reps_W' determining bound on DetectMV and FindMV
+        :param bound: Bounds on estimation of subtree size, 'LBLB', 'UBLB', 'UBUB'
+        :param results_dir:
         """
+
         self.results_dir=results_dir
-        super().__init__(bound_coef, modulus_q, const_reps_QPE, const_reps_W, num_nodes_branching_dfs, force_DF)
+        self.bound = bound
+        self.constants = constants
+        super().__init__(q, constants, bound)
 
     def prepare_plot_dir(self, n, circuit, results_dir='costResults'):
         """
@@ -392,19 +335,20 @@ class ResultFiles(CostFiles):
         :param n: BKZ blocksize
         :param circuit: Circuit instantiation
         :param results_dir: Target directory for output files
-        :return:
+        :return: string
         """
         full_dir = self.results_dir + '/' + str(circuit.desc) + '/' + str(n) + '/'
         os.system('mkdir -p ' + full_dir)
         os.system('touch ' + full_dir + '/PLACEHOLDER')
         return full_dir
+
     def prepare_critical_dir(self, n, circuit, results_dir='costResults'):
         """
         Prepare dorectory for plots
         :param n: BKZ blocksize
         :param circuit: Circuit instantiation
         :param results_dir: Target directory for output files
-        :return:
+        :return: string
         """
         full_dir = self.results_dir + '/' + str(circuit.desc) + '/'
         os.system('mkdir -p ' + full_dir)
@@ -413,18 +357,18 @@ class ResultFiles(CostFiles):
 
     def get_plot_filename(self, circuit, n, max_depth, prefix, postfix):
         """
-        Name for plot files.
+        (Instance-Unique) name for plot files.
         :param n: BKZ blocksize
         :param circuit: Circuit instantiation
         :param max_depth: MaxDepth constraint
         :param prefix: Filename prefix.
         :param postfix: Filename postfix.
-        :return:
+        :return: string
         """
-        strings = [prefix, circuit.desc, str(max_depth), str(n), postfix]
+        strings = [prefix, circuit.desc, str(max_depth), str(n), self.bound, postfix]
         return f"{'_'.join(filter(None, strings))}"
 
-    def write_table_critical(self, n, max_depth, circuit, z_to_cost, log_M, prefix, postfix, print_header=False):
+    def write_table_critical(self, z_to_cost, intersections, n, max_depth, circuit, prefix, postfix, print_header=False):
         """
         Output of crititical values (ie. intersection with security bounds), eqaivalent to
             Table 6 in Section 6
@@ -437,20 +381,19 @@ class ResultFiles(CostFiles):
         :param prefix: Prefix for filename
         :param postfix: Postfix for filenames
         :param print_header: Flag to print header of tables
-        :return:
         """
         full_dir = self.prepare_critical_dir(n, circuit)
-        filename = f"{'_'.join(filter(None, [prefix, circuit.desc, postfix]))}.critical"
+        filename = f"{'_'.join(filter(None, [prefix, circuit.desc, self.bound, postfix]))}.critical"
 
         header = True
         if os.path.isfile(f"{full_dir}/{filename}"):
             header = False
         file = open(f"{full_dir}/{filename}", 'a')
 
-        def line(circ_desc, n, md, z_exp_sec, z_aes_sec, z_quasi_quadratic):
-            return '{z: >10},{n: >4},{m: >8},{e: >16},{a: >16},{q: >16}'.format(z=circ_desc,n=n, m=md, a=f"{z_aes_sec}", e=f"{z_exp_sec}", q=f"{z_quasi_quadratic}")
+        def line(circ_desc, n, md, z_aes_sec, z_quasi_quadratic, z_exp_sec):
+            return '{z: >10};{n: >4};{m: >8};{a: >37};{q: >37};{e: >37}'.format(z=circ_desc,n=n, m=md, a=f"{z_aes_sec}", e=f"{z_exp_sec}", q=f"{z_quasi_quadratic}")
 
-        l = line('Circuit', 'n', 'MaxDepth', '{128,192,256}', 'Grover on AES', 'Quasi-Sqrt')
+        l = line('Circuit', 'n', 'MaxDepth', 'Grover on AES', 'Quasi-Sqrt', '{128,192,256}', )
         l2 = line('----------', '----', '--------', '-------------', '-------------', '----------')
 
         if header:
@@ -462,21 +405,19 @@ class ResultFiles(CostFiles):
             print(l, flush=True)
             print(l2, flush=True)
 
-        intersections = get_intersections(n, max_depth, log_M, z_to_cost)
-
-        def format_intersection(z_value, inequality, k_value):
+        def format_intersection(z_value, inequality, k_value, y_value, total_g_cost):
             if inequality == '<=':
-                return 'z >= ' + str(z_value) + ' k <= ' + str(k_value) # + ' | cost <= crit '
+                return 'z >= ' + str(z_value) + ', k <= ' + str(k_value) + ', y = ' + str(y_value) + ', tgcost >= ' + str(math.floor(total_g_cost))
             elif inequality == '<':
-                return 'z >= ' + str(z_value) + ' k <= ' + str(k_value) # + ' | cost < crit '
+                return 'z >= ' + str(z_value) + ', k <= ' + str(k_value) + ', y = ' + str(y_value) + ', tgcost = ' + str(math.floor(total_g_cost))
             else:
-                return 'z <= ' + str(z_value) + ' k = - ' # + ' | cost > crit '
+                return 'z <= ' + str(z_value) + ', k = - ' + ', y = ' + str(y_value) + ', tgcost >= ' + str(math.floor(total_g_cost))
 
-        target_str = format_intersection(z_value=intersections['target'][0], inequality=intersections['target'][1], k_value=z_to_cost[intersections['target'][0]].k)
-        aes_grover_str = format_intersection(z_value = intersections['aes_grover'][0], inequality=intersections['aes_grover'][1], k_value=z_to_cost[intersections['aes_grover'][0]].k)
-        quasi_quadratic_str = format_intersection(z_value = intersections['quasi-quadratic'][0], inequality=intersections['quasi-quadratic'][1], k_value=z_to_cost[intersections['quasi-quadratic'][0]].k)
+        target_str = format_intersection(z_value=intersections['target'][0], inequality=intersections['target'][1], k_value=z_to_cost[intersections['target'][0]].k, y_value=z_to_cost[intersections['target'][0]].log_y, total_g_cost = intersections['target'][2])
+        aes_grover_str = format_intersection(z_value = intersections['aes_grover'][0], inequality=intersections['aes_grover'][1], k_value=z_to_cost[intersections['aes_grover'][0]].k, y_value=z_to_cost[intersections['aes_grover'][0]].log_y, total_g_cost = intersections['aes_grover'][2])
+        quasi_quadratic_str = format_intersection(z_value = intersections['quasi-quadratic'][0], inequality=intersections['quasi-quadratic'][1], k_value=z_to_cost[intersections['quasi-quadratic'][0]].k, y_value=z_to_cost[intersections['quasi-quadratic'][0]].log_y, total_g_cost = intersections['quasi-quadratic'][2])
 
-        l = line(circuit.desc, n, max_depth,  target_str, aes_grover_str, quasi_quadratic_str)
+        l = line(circuit.desc, n, max_depth,  aes_grover_str, quasi_quadratic_str, target_str)
         file.write(l + '\n')
 
         print(l)
@@ -494,7 +435,6 @@ class ResultFiles(CostFiles):
         :param circuit: Circuit instantiation
         :param op_Ra_gate_costs: Dictionary of gate costs
         :param verb:
-        :return:
         """
         log_op_Ra_gate_costs = {}
         for gateid, count in op_Ra_gate_costs.items():
@@ -540,7 +480,7 @@ class ResultFiles(CostFiles):
             print(head)
             print(l)
 
-    def write_table_costs(self, n, max_depth, circuit, z_to_cost, prefix, postfix):
+    def write_table_costs(self, z_to_cost, n, max_depth, circuit, prefix, postfix):
         """
         Write table with costs for every Jensen'z of result to file.
         :param n:  BKZ blocksize
@@ -549,7 +489,6 @@ class ResultFiles(CostFiles):
         :param z_to_cost: Result Dictionary [Jensen's z] --> cost
         :param prefix: Filename prefix
         :param postfix: Filename postfix
-        :return:
         """
         full_dir = self.prepare_plot_dir(n, circuit)
         filename = self.get_plot_filename(circuit, n, max_depth, prefix, postfix)
@@ -563,16 +502,12 @@ class ResultFiles(CostFiles):
         file.write(line('z', 'm', 'y', 'k', 'classical', 'quantum', 'qracm', 't-dep'))
         file.write('\n')
 
-        treeH = TH.TreeHeuristics()
-
         z_range = z_to_cost.keys()
         for z in sorted(z_range):
             k = z_to_cost[z].k
 
             if k < n + 1:
                 log_m = z_to_cost[z].log_m
-                costF = CF.CostFunctions(treeH, n=n, bound_coefficient=-1, nbases=2 ** log_m, pprime=1,
-                                         const_reps_QPE=-1, const_reps_W=-1, num_nodes_branching_dfs=-1, force_DF=-1)
             cost = z_to_cost[z]
 
 
@@ -580,11 +515,6 @@ class ResultFiles(CostFiles):
                             round(float(cost.log_gcost_quantum), 2), round(float(cost.qracm), 1), round(float(cost.log_t_depth), 2)))
             file.write('\n')
 
-        #print(f" (write_table_costs) Read cached data from {full_dir}/{filename}")
-
-
-def pprint(x, round_decimals = 2):
-    return round(float(x), round_decimals)
 
 def add_logs(log_x, log_y):
     """
@@ -593,18 +523,8 @@ def add_logs(log_x, log_y):
     :param log_y: log of y
     :return: log_2(2^x + 2^y)
     """
-    return float((RRR(2**log_x) + RRR(2**log_y)).log2())
+    return doNumber((RRR(2**log_x) + RRR(2**log_y)).log2())
     #return doLog2(2**log_x + 2**log_y)
-
-def sub_logs(log_x, log_y):
-    """
-    Global function for subtraction of numbers given as logarithms.
-    :param log_x: log of X
-    :param log_y: log of Y
-    :return: log_2(2^x - 2^y)
-    """
-    return float((RRR(2**log_x) + RRR(2**log_y)).log2())
-    #return doLog2(2**log_x - 2**log_y)
 
 def doLog2(x):
     """
@@ -624,26 +544,3 @@ def doNumber(x):
     """
     #return RRR(x)
     return float(x)
-
-
-def parse_bound_node_degree_file(beta, filename):
-    """
-    Read bound on number of children for Q# circuit estimation
-    :param beta:  BKZ blocksize, number of levels to read
-    :param filename: Target filename
-    :return:
-    """
-    file = open(filename, "r")
-
-    line = file.readline()
-    if not line.strip():
-        return {}
-    values = line.strip().split(',')
-    bounds = [math.ceil(float(b)) for b in values[3:]]
-    # Maximal number of children for all level below current
-    max_bound_below = {0: max(bounds)}
-    for i in range(0, beta):
-        # shifted by one for top tree
-        max_bound_below[i + 1] = max(bounds[i:])
-
-    return max_bound_below
